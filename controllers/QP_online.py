@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+@author: mark 
+
+A quadratic programming (QP) controller that satisfies the following safety 
+constraints: 
+    (i) max thrust: Fx, Fy \in [Fmin, Fmax]
+    (ii) max velocity: xdot, ydot \in [vmin, vmax]
+
+
+Assumes: in-plane dynamics 
+
+The optimization problem is solved at each call of the controller 
+
+Key Paramters:
+    self.total_plan_time: total time to the goal 
+        * note: if this is too short, then no feasible solutions will be found 
+    self.tau0: number of steps in the initial planning horizon
+    
+Note: the time period between steps in the planner "self.dt_plan" 
+will remain constant, and the number of steps in the time horizon "tau" will 
+be decreased as the vehicle approaches the goal 
+
+
+TODO: Increase time horizon if first iteration is infeasable 
+
+"""
+
+import numpy as np 
+import os, sys, inspect
+sys.path.insert(0,os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))) 
+from parameters import SystemParameters 
+import gurobipy as gp 
+from gurobipy import GRB
+
+
+class Controller(SystemParameters): 
+    def __init__(self):
+        
+        self.zero_input = np.zeros([3,1])
+        self.trajectory_initialized = False 
+        
+        self.total_plan_time = 50 # time to goal [s] 
+        self.tau0 = 300 # number steps in initial planning horizon 
+        
+        self.t = np.linspace(0,self.total_plan_time, self.tau0) # time vector 
+        self.dt_plan = self.t[1]-self.t[0] # time resolution of solver 
+        
+        # self.xstar = 0 # optimal trajectory points 
+        self.ustar = 0 # optimal control points 
+        
+        
+    def main(self, x0, t):
+        """
+        Computes trajectory and uses first input 
+        
+        """
+        
+        # Try to find optimal trajectory
+        try: 
+            self.calculate_trajectory(x0, t) # finds traj starting at x0 
+        except: 
+            print("\nFailed to find trajectory at t = "+str(t))
+        
+        
+        u = self.ustar[:,0]
+            
+        return u.reshape(3,1)
+        
+    
+    def calculate_trajectory(self, x0, t_elapsed):
+        """
+        Uses Gurobi to calculate optimal trajectory points (self.xstar) and 
+        control inputs (self.ustar)
+
+        """
+        
+        initial_state = x0.reshape(6)
+        goal_state = np.zeros(6)
+        n  = self.mean_motion
+        mc = self.mass_chaser
+
+        # Shorten the number of initial time steps (self.tau0) based on the amount of time elapsed        
+        tau = int(max(5, np.round(self.tau0 - t_elapsed/self.dt_plan) ) )
+        print("time elapsed = ", t_elapsed )
+        
+        # Set Ranges 
+        smax = 10000 # arbitrary (included bounds to speed up solver)
+        vmax = 10 # [m/s] max velocity 
+        Fmax = 20 # [N] max force 
+        
+        
+        # Initialize states 
+        sx = [] 
+        sy = [] 
+        vx = [] 
+        vy = [] 
+        Fx = [] 
+        Fy = [] 
+        
+        m = gp.Model("QPTraj")
+        
+        # Define variables at each of the tau timesteps 
+        for t in range(tau) : 
+            sx.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -smax, ub = smax, name="sx"+str(t) )) 
+            vx.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -vmax, ub = vmax, name="vx"+str(t) )) 
+            Fx.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -Fmax, ub = Fmax, name="Fx"+str(t) )) 
+            sy.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -smax, ub = smax, name="sy"+str(t) )) 
+            vy.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -vmax, ub = vmax, name="vy"+str(t) )) 
+            Fy.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -Fmax, ub = Fmax, name="Fy"+str(t) )) 
+        
+        m.update()
+                
+        # Set boundary conditions 
+        m.addConstr( sx[0] == initial_state[0] , "sx0")
+        m.addConstr( sy[0] == initial_state[1] , "sy0")
+        m.addConstr( vx[0] == initial_state[3] , "vx0")
+        m.addConstr( vy[0] == initial_state[4] , "vy0")
+        m.addConstr( sx[-1] == goal_state[0] , "sxf")
+        m.addConstr( sy[-1] == goal_state[1] , "syf")
+        m.addConstr( vx[-1] == goal_state[3] , "vxf")
+        m.addConstr( vy[-1] == goal_state[4] , "vyf")
+        
+        
+        # Set Dynamics 
+        for t in range(tau-1) :
+            # Dynamics 
+            m.addConstr( sx[t+1] == sx[t] + vx[t]*self.dt_plan , "Dsx_"+str(t))
+            m.addConstr( sy[t+1] == sy[t] + vy[t]*self.dt_plan , "Dsy_"+str(t))
+            m.addConstr( vx[t+1] == vx[t] + sx[t]*3*n**2*self.dt_plan + sy[t]*2*n*self.dt_plan + Fx[t]*(1/mc)*self.dt_plan , "Dvx_"+str(t) )
+            m.addConstr( vy[t+1] == vy[t] - vx[t]*2*n*self.dt_plan                   + Fy[t]*(1/mc)*self.dt_plan , "Dvy_"+str(t) )
+        
+        
+        # Set Objective ( minimize: sum(Fx^2 + Fy^2) )
+        obj = Fx[0]*Fx[0] + Fy[0]*Fy[0]
+        for t in range(0, tau):
+            obj = obj + Fx[t]*Fx[t] + Fy[t]*Fy[t]
+        
+        
+        
+        m.setObjective(obj, GRB.MINIMIZE)
+        m.setParam( 'OutputFlag', False )
+        
+        # Optimize and report on results 
+        m.optimize()
+        
+        
+        # Save desired trajectory 
+        # self.xstar = np.zeros([6, tau]) 
+        self.ustar = np.zeros([3, tau])
+        
+        for t in range(tau): # TODO: find quicker way to do this 
+            # self.xstar[0,t] = m.getVarByName("sx"+str(t)).x
+            # self.xstar[1,t] = m.getVarByName("sy"+str(t)).x
+            # self.xstar[3,t] = m.getVarByName("vx"+str(t)).x
+            # self.xstar[4,t] = m.getVarByName("vy"+str(t)).x
+            self.ustar[0,t] = m.getVarByName("Fx"+str(t)).x
+            self.ustar[1,t] = m.getVarByName("Fy"+str(t)).x
+        
+        
