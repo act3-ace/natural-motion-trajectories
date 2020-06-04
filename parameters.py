@@ -5,6 +5,7 @@ This class specifies all system parameters
 
 """
 
+
 class SystemParameters:
     # Physical  
     mean_motion = 0.001027; # [rad/s]   

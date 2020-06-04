@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import random as rand 
 import sys 
 from parameters import SystemParameters 
+from ClohessyWiltshire import ClohessyWiltshire
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
@@ -32,7 +33,7 @@ from controllers.simple_linear_controller import Controller
 
 # Flags 
 f_plot_option = 2 # choose 0, 1, or 2
-f_save_plot = False # saves a plot at end of simulation 
+f_save_plot = True # saves a plot at end of simulation 
 
 
 # Parameters 
@@ -58,24 +59,6 @@ x0 = np.array([[18*(rand.random()-0.5)],  # x
 u0 = np.array([[0],  # Fx 
                [0],  # Fy
                [0]]) # Fz
-
-
-# Define CWH Dynamics 
-A = np.array([[0, 0, 0, 1, 0, 0],
-              [0, 0, 0, 0, 1, 0],
-              [0, 0, 0, 0, 0, 1],
-              [3*mean_motion**2, 0, 0, 0, 2*mean_motion, 0],
-              [0, 0, 0, -2*mean_motion, 0, 0],
-              [0, 0, -mean_motion**2, 0, 0, 0]])
-B = np.array([[0, 0, 0],
-              [0, 0, 0],
-              [0, 0, 0],
-              [1/mass_chaser, 0, 0],
-              [0, 1/mass_chaser, 0],
-              [0, 0, 1/mass_chaser]])
-
-def F(x,u):
-    return np.matmul(A,x)+np.matmul(B,u)
 
 
 ##############################################################################
@@ -113,7 +96,7 @@ for i in range(1,Nsteps):
     U[:,i] = u.reshape(dim_control) # record history of control inputs (optional)
     
     # Propagate 
-    xdot = F(X[:,i-1].reshape(dim_state,1) , u)*dt
+    xdot = ClohessyWiltshire.CW(X[:,i-1].reshape(dim_state,1) , u)*dt
     X[:,i] = X[:,i-1] + xdot.reshape(dim_state)
 
 
