@@ -19,10 +19,10 @@ from ClohessyWiltshire import ClohessyWiltshire
 class dynamicFilter(SystemParameters, ClohessyWiltshire): 
     def __init__(self):
          
-        self.Q = np.identity(6)
+        self.Q = np.identity(6) # Process Noise
 
-        self.H = np.identity(6)
-        self.R = np.identity(6)
+        self.H = np.identity(6) # Jacobian of measurement function
+        self.R = np.identity(6) # Measuremnt Noise
         
 
     def main(self, x_est0, x_meas, P, u, dt):
@@ -33,18 +33,21 @@ class dynamicFilter(SystemParameters, ClohessyWiltshire):
             x_pred = np.matmul(F,state) + np.matmul(self.B, u)
 
             # Predict Covariance
-            #print(F)
             P_pred = np.matmul(np.matmul(F,P),F.transpose()) + self.Q
+
             return x_pred, P_pred
 
         def update(self, state, P_prev, meas_state):
             # Preliminary Info
-            v = meas_state-state
+            v = meas_state-state # Difference in predicted and measured state
+
+            # S = HPH'+HRH'
             S = np.matmul(np.matmul(self.H,P_prev),self.H.transpose())+np.matmul(np.matmul(self.H,self.R),self.H.transpose())
-            K = np.matmul(np.matmul(P_prev, self.H.transpose()),linalg.inv(S))
+            # K = PH'S^(-1)
+            K = np.matmul(np.matmul(P_prev, self.H.transpose()),linalg.inv(S)) # Kalman Gain
 
             # Update State Estimation
-            x_hat = state+np.matmul(K,v)
+            x_hat = state+np.matmul(K,v) 
 
             # Update Covariance Matrix
             # P = (I-KH)P(I-KH)'+KRK'
@@ -56,7 +59,7 @@ class dynamicFilter(SystemParameters, ClohessyWiltshire):
         # Prediction Step
         x_pred, P_pred = predict(self, x_est0, P, u, dt)
 
-        #    Update Step
+        # Update Step
         x_hat, P_hat = update(self, x_pred, P_pred, x_meas)
 
         return x_hat, P_hat
