@@ -34,7 +34,7 @@ from filters.ExtendedKalmanFilter import dynamicFilter
 ##############################################################################
 
 # Flags 
-f_plot_option = 3 # choose 0, 1, or 2
+f_plot_option = 3 # choose 0, 1, 2, or 3 
 f_save_plot = True # saves a plot at end of simulation 
 
 
@@ -203,7 +203,8 @@ elif f_plot_option == 2 :
     ax1.plot(0,0,'go', alpha=0.5)
     ax1.set_xlabel("x-position", fontsize=ax_label_font)
     ax1.set_ylabel("y-position", fontsize=ax_label_font)
-    
+    plt.title("In-Plane Trajectory", fontsize=ax_label_font)
+
     ax2 = fig.add_subplot(132)
     ax2.grid()
     ax2.plot(t, X[3,:],'.', color='r', markersize=marker_size, alpha=0.2)
@@ -212,6 +213,8 @@ elif f_plot_option == 2 :
     ax2.plot(t, X[4,:], color='blue', linewidth=line_width, alpha=0.6)
     ax2.set_xlabel("time", fontsize=ax_label_font)
     ax2.set_ylabel("velocity", fontsize=ax_label_font)
+    plt.title("Velocity vs. Time", fontsize=ax_label_font)
+
     
     ax3 = fig.add_subplot(133)
     ax3.plot(t, U[0,:], '.', color='red', markersize=marker_size, alpha=0.8)
@@ -221,6 +224,7 @@ elif f_plot_option == 2 :
     ax3.grid()
     ax3.set_xlabel("time", fontsize=ax_label_font)
     ax3.set_ylabel("thrust force", fontsize=ax_label_font)
+    plt.title("Thrust vs. Time", fontsize=ax_label_font)
 
 
 elif f_plot_option == 3 :
