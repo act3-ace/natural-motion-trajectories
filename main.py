@@ -222,6 +222,7 @@ elif f_plot_option == 2 :
     ax3.set_xlabel("time", fontsize=ax_label_font)
     ax3.set_ylabel("thrust force", fontsize=ax_label_font)
 
+
 elif f_plot_option == 3 :
     # Style plot 
     marker_size = 1.5
@@ -242,6 +243,8 @@ elif f_plot_option == 3 :
     ax1.plot(X[0,0],X[1,0],'kx')
     ax1.set_xlabel("$x-position$", fontsize=ax_label_font)
     ax1.set_ylabel("$y-position$", fontsize=ax_label_font)
+    plt.title("In-Plane Trajectory", fontsize=ax_label_font)
+
 
     ax2 = fig.add_subplot(132)
     ax2.grid()
@@ -251,6 +254,8 @@ elif f_plot_option == 3 :
     ax2.set_xlabel("$time$", fontsize=ax_label_font)
     ax2.set_ylabel("$state-error$", fontsize=ax_label_font)
     ax2.legend()
+    plt.title("State-Error vs. Time", fontsize=ax_label_font)
+
 
     ax3 = fig.add_subplot(133)
     ax3.plot(t, U[0,:], '.', color='red', markersize=marker_size, alpha=0.8)
@@ -260,6 +265,8 @@ elif f_plot_option == 3 :
     ax3.grid()
     ax3.set_xlabel("time", fontsize=ax_label_font)
     ax3.set_ylabel("thrust force", fontsize=ax_label_font)
+    plt.title("Thrust vs. Time", fontsize=ax_label_font)
+
 
 # Save and Show 
 if f_save_plot: 
