@@ -24,6 +24,8 @@ be decreased as the vehicle approaches the goal
 
 
 TODO: Increase time horizon if first iteration is infeasable 
+TODO: Add safety constraint number 3, defining a position dependent speed limit 
+TODO: regulation to trajectory point once reached 
 
 """
 
@@ -38,17 +40,28 @@ from gurobipy import GRB
 class Controller(SystemParameters): 
     def __init__(self):
         
-        self.zero_input = np.zeros([3,1])
-        self.trajectory_initialized = False 
+        # Options 
+        self.f_goal_set = 1 # 0 for origin, 1 for stationary points 
         
         self.total_plan_time = 50 # time to goal [s] 
         self.tau0 = 300 # number steps in initial planning horizon 
+        
+        
+        # Set up (don't modify )
+        self.zero_input = np.zeros([3,1])
+        self.trajectory_initialized = False 
         
         self.t = np.linspace(0,self.total_plan_time, self.tau0) # time vector 
         self.dt_plan = self.t[1]-self.t[0] # time resolution of solver 
         
         # self.xstar = 0 # optimal trajectory points 
         self.ustar = 0 # optimal control points 
+        
+        if self.f_goal_set == 0: 
+            print("\nDriving chaser to target! \n")
+        elif self.f_goal_set == 1: 
+            print("\nDriving chaser to stationary trajectory! \n")
+
         
         
     def main(self, x0, t):
@@ -117,11 +130,18 @@ class Controller(SystemParameters):
         m.addConstr( sy[0] == initial_state[1] , "sy0")
         m.addConstr( vx[0] == initial_state[3] , "vx0")
         m.addConstr( vy[0] == initial_state[4] , "vy0")
-        m.addConstr( sx[-1] == goal_state[0] , "sxf")
-        m.addConstr( sy[-1] == goal_state[1] , "syf")
-        m.addConstr( vx[-1] == goal_state[3] , "vxf")
-        m.addConstr( vy[-1] == goal_state[4] , "vyf")
         
+        if self.f_goal_set == 0: 
+            # Go to origin 
+            m.addConstr( sx[-1] == goal_state[0] , "sxf")
+            m.addConstr( sy[-1] == goal_state[1] , "syf")
+            m.addConstr( vx[-1] == goal_state[3] , "vxf")
+            m.addConstr( vy[-1] == goal_state[4] , "vyf")
+        elif self.f_goal_set == 1: 
+            # Go to stationary point (everything to origin except y-position)
+            m.addConstr( sx[-1] == goal_state[0] , "sxf")
+            m.addConstr( vx[-1] == goal_state[3] , "vxf")
+            m.addConstr( vy[-1] == goal_state[4] , "vyf")
         
         # Set Dynamics 
         for t in range(tau-1) :
