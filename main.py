@@ -71,7 +71,7 @@ x_hat = x0+np.array([[100*rand.random()],
                     [0],
                     [0]])
 
-P = 1000*np.identity(6)
+P = np.identity(6)
 
 
 ##############################################################################
@@ -84,6 +84,7 @@ X = np.zeros([dim_state, Nsteps]) # state at each time
 U = np.zeros([dim_control, Nsteps]) # control at each time 
 X_hat = np.zeros([dim_state, Nsteps]) # state estimate at each time step
 state_error = np.zeros([dim_state, Nsteps]) # State error at each time step
+X_meas = np.zeros([dim_state, Nsteps])
 dt = t[1]-t[0]
 X[:,0]=x0.reshape(dim_state)
 X_hat[:,0] = x_hat.reshape(dim_state)
@@ -102,7 +103,7 @@ for i in range(1,Nsteps):
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
     # Call Controller
     if (i-1)%steps_per_sample == 0: 
-        u = controller.main(X[:,i-1], (i-1)*dt)  
+        u = np.zeros((3,1))#controller.main(X[:,i-1], (i-1)*dt)  
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
     
@@ -119,11 +120,13 @@ for i in range(1,Nsteps):
     xdot = ClohessyWiltshire.CW(X[:,i-1].reshape(dim_state,1) , u)*dt
     X[:,i] = X[:,i-1] + xdot.reshape(dim_state)
 
+
     # Run Filter
-    x_meas = X[:,i].reshape((dim_state,1))
-    x_hat, P = filterScheme.main(x_hat, x_meas, P, u, dt)
+    x_real = X[:,i].reshape((dim_state,1))
+    x_hat, P = filterScheme.main(x_hat, x_real, P, u, dt)
     X_hat[:,i] = x_hat.reshape(dim_state)
 
+    # Calculate state error
     state_error[:,i] = X_hat[:,i]-X[:,i]
 
 ##############################################################################
@@ -243,6 +246,7 @@ elif f_plot_option == 3 :
     ax1.set_xlabel("$x-position$", fontsize=ax_label_font)
     ax1.set_ylabel("$y-position$", fontsize=ax_label_font)
 
+    """
     ax2 = fig.add_subplot(132)
     ax2.grid()
     ax2.plot(t,state_error[0,:],color='blue',markersize=marker_size, alpha=0.8,label='$x-error$')
@@ -251,7 +255,15 @@ elif f_plot_option == 3 :
     ax2.set_xlabel("$time$", fontsize=ax_label_font)
     ax2.set_ylabel("$state-error$", fontsize=ax_label_font)
     ax2.legend()
-
+    """
+    ax2 = fig.add_subplot(132)
+    ax2.grid()
+    ax2.plot(t,X[0,:],color='blue',markersize=marker_size, alpha=0.8,label='$truth$')
+    ax2.plot(t,X_hat[0,:],color='red',markersize=marker_size, alpha=0.8,label='$estimate$')
+    ax2.set_xlabel("$time$", fontsize=ax_label_font)
+    ax2.set_ylabel("$Response$", fontsize=ax_label_font)
+    ax2.legend()
+    
     ax3 = fig.add_subplot(133)
     ax3.plot(t, U[0,:], '.', color='red', markersize=marker_size, alpha=0.8)
     ax3.plot(t, U[1,:], '.', color='blue', markersize=marker_size, alpha=0.8)
