@@ -95,7 +95,7 @@ class Controller(SystemParameters):
         mc = self.mass_chaser
 
         # Shorten the number of initial time steps (self.tau0) based on the amount of time elapsed        
-        tau = int(max(5, np.round(self.tau0 - t_elapsed/self.dt_plan) ) )
+        tau = int(max(10, np.round(self.tau0 - t_elapsed/self.dt_plan) ) )
         print("time elapsed = ", t_elapsed )
         
         # Set Ranges 
