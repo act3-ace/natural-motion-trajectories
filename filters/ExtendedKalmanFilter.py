@@ -18,51 +18,55 @@ from ClohessyWiltshire import ClohessyWiltshire
 
 class dynamicFilter(SystemParameters, ClohessyWiltshire): 
     def __init__(self):
-         
-        self.Q = np.identity(6) # Process Noise
+        
+        self.Q = [] # Process Noise
 
-        self.H = np.identity(6) # Jacobian of measurement function
-        self.R = np.identity(6) # Measuremnt Noise
+        self.H = [] # Jacobian of measurement function
+        self.R = [] # Measurement Noise
         
 
-    def main(self, x_est0, x_meas, P, u, dt):
+    def main(self, est_state, meas_state, P, u, dt, MeasurementModel):
 
         def predict(self, state, P, u, dt):
             # Propagate State
-            F = linalg.expm((ClohessyWiltshire.A+np.matmul(ClohessyWiltshire.B, u))*dt)
-            x_pred = np.matmul(F,state) + np.matmul(self.B, u)
+            F = linalg.expm((ClohessyWiltshire.A)*dt)
+            x_pred = np.matmul(F,state)+np.matmul(ClohessyWiltshire.B, u)*dt
 
             # Predict Covariance
             P_pred = np.matmul(np.matmul(F,P),F.transpose()) + self.Q
 
             return x_pred, P_pred
 
-        def update(self, state, P_prev, meas_state):
+        def update(self, x_pred, P_pred, meas_state):
             # Preliminary Info
-            v = meas_state-state # Difference in predicted and measured state
-
-            # S = HPH'+HRH'
-            S = np.matmul(np.matmul(self.H,P_prev),self.H.transpose())+np.matmul(np.matmul(self.H,self.R),self.H.transpose())
+            v = meas_state-x_pred # Difference in predicted and measured state
+            # S = HPH'+R
+            S = np.matmul(np.matmul(self.H,P_pred),self.H.transpose())+np.matmul(np.matmul(self.H,self.R),self.H.transpose())
             # K = PH'S^(-1)
-            K = np.matmul(np.matmul(P_prev, self.H.transpose()),linalg.inv(S)) # Kalman Gain
+            K = np.matmul(np.matmul(P_pred, self.H.transpose()),linalg.inv(S)) # Kalman Gain
 
             # Update State Estimation
-            x_hat = state+np.matmul(K,v) 
+            x_hat = x_pred+np.matmul(K,v) 
 
             # Update Covariance Matrix
             # P = (I-KH)P(I-KH)'+KRK'
             I_KH = np.identity(6) - np.matmul(K,self.H)
-            P = np.matmul(np.matmul(I_KH, P_prev),I_KH.transpose())+np.matmul(np.matmul(K,self.R),K.transpose())
-
+            P = np.matmul(np.matmul(I_KH, P_pred),I_KH.transpose())+np.matmul(np.matmul(K,self.R),K.transpose())
+        
             return x_hat, P
         
+        # Define Measurement Parameters
+        self.R = MeasurementModel.R
+        self.Q = MeasurementModel.Q
+        self.H = MeasurementModel.H
+        
         # Prediction Step
-        x_pred, P_pred = predict(self, x_est0, P, u, dt)
+        x_pred, P_pred = predict(self, est_state, P, u, dt)
 
         # Update Step
-        x_hat, P_hat = update(self, x_pred, P_pred, x_meas)
+        x_hat, P = update(self, x_pred, P_pred, meas_state)
 
-        return x_hat, P_hat
+        return x_hat, P
 
         
 

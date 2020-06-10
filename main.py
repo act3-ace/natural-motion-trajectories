@@ -24,6 +24,8 @@ from ClohessyWiltshire import ClohessyWiltshire
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 # Import the Desired Controller from the "controllers" directory 
 from controllers.simple_linear_controller import Controller
+# Import the Desired Measurement Model 
+from MeasurementModel import MeasurementModel
 # Import the Desired Filter from the "filters" directory 
 from filters.ExtendedKalmanFilter import dynamicFilter
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
@@ -34,7 +36,7 @@ from filters.ExtendedKalmanFilter import dynamicFilter
 ##############################################################################
 
 # Flags 
-f_plot_option = 3 # choose 0, 1, or 2
+f_plot_option = 3 # choose 0, 1, 2, or 3
 f_save_plot = True # saves a plot at end of simulation 
 
 
@@ -64,9 +66,9 @@ u0 = np.array([[0],  # Fx
                [0]]) # Fz
 
 # Setup filter paramters
-x_hat = x0+np.array([[100*rand.random()],
-                    [100*rand.random()],
-                    [0*rand.random()],
+x_hat = x0+np.array([[rand.random()-0.5],
+                    [rand.random()-0.5],
+                    [0],
                     [0],
                     [0],
                     [0]])
@@ -89,8 +91,10 @@ dt = t[1]-t[0]
 X[:,0]=x0.reshape(dim_state)
 X_hat[:,0] = x_hat.reshape(dim_state)
 state_error[:,0] = X_hat[:,0]-X[:,0] # state error at initial time step
-controller = Controller() # initialize Controller class 
+controller = Controller() # Initialize Controller class 
 filterScheme = dynamicFilter() # Initialize filter class
+takeMeasurement = MeasurementModel() # Define Measurement Model
+X_meas[:,0] = takeMeasurement.MeasureFcn(X[:,0])
 
 
 steps_per_sample = np.max([1, np.round(T_sample/dt)])
@@ -103,7 +107,7 @@ for i in range(1,Nsteps):
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
     # Call Controller
     if (i-1)%steps_per_sample == 0: 
-        u = np.zeros((3,1))#controller.main(X[:,i-1], (i-1)*dt)  
+        u = controller.main(X_hat[:,i-1], (i-1)*dt)  
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
     
@@ -120,10 +124,13 @@ for i in range(1,Nsteps):
     xdot = ClohessyWiltshire.CW(X[:,i-1].reshape(dim_state,1) , u)*dt
     X[:,i] = X[:,i-1] + xdot.reshape(dim_state)
 
+    # Compute Measurement
+    x_meas = MeasurementModel.MeasureFcn(X[:,i])
+    X_meas[:,i] = x_meas
+    x_meas = x_meas.reshape(dim_state,1)
 
     # Run Filter
-    x_real = X[:,i].reshape((dim_state,1))
-    x_hat, P = filterScheme.main(x_hat, x_real, P, u, dt)
+    x_hat, P = filterScheme.main(x_hat, x_meas, P, u, dt, MeasurementModel)
     X_hat[:,i] = x_hat.reshape(dim_state)
 
     # Calculate state error
@@ -225,6 +232,7 @@ elif f_plot_option == 2 :
     ax3.set_xlabel("time", fontsize=ax_label_font)
     ax3.set_ylabel("thrust force", fontsize=ax_label_font)
 
+
 elif f_plot_option == 3 :
     # Style plot 
     marker_size = 1.5
@@ -240,30 +248,27 @@ elif f_plot_option == 3 :
     # Plot results 
     ax1 = fig.add_subplot(131)
     ax1.grid()
-    ax1.plot(X[0,:],X[1,:],'.', color='coral', markersize=marker_size, alpha=0.8)
-    ax1.plot(X_hat[0,:],X_hat[1,:],color='blue', linewidth=line_width, alpha=0.6)
+    ax1.plot(X[0,:],X[1,:], color='coral', markersize=marker_size, alpha=0.8,label='Truth')
+    ax1.plot(X_hat[0,:],X_hat[1,:],color='blue', linewidth=line_width, alpha=0.6,label='Estimated')
+    ax1.plot(X_meas[0,:],X_meas[1,:],color='green', linewidth=line_width, alpha=0.4,label='Measured')
     ax1.plot(X[0,0],X[1,0],'kx')
     ax1.set_xlabel("$x-position$", fontsize=ax_label_font)
     ax1.set_ylabel("$y-position$", fontsize=ax_label_font)
+    plt.title("In-Plane Trajectory", fontsize=ax_label_font)
+    ax1.legend()
 
-    """
     ax2 = fig.add_subplot(132)
     ax2.grid()
     ax2.plot(t,state_error[0,:],color='blue',markersize=marker_size, alpha=0.8,label='$x-error$')
     ax2.plot(t,state_error[1,:],color='red',markersize=marker_size, alpha=0.8,label='$y-error$')
-    ax2.set_ylim(-1,1)
+    #ax2.set_ylim(-1,1)
     ax2.set_xlabel("$time$", fontsize=ax_label_font)
     ax2.set_ylabel("$state-error$", fontsize=ax_label_font)
     ax2.legend()
-    """
-    ax2 = fig.add_subplot(132)
-    ax2.grid()
-    ax2.plot(t,X[0,:],color='blue',markersize=marker_size, alpha=0.8,label='$truth$')
-    ax2.plot(t,X_hat[0,:],color='red',markersize=marker_size, alpha=0.8,label='$estimate$')
-    ax2.set_xlabel("$time$", fontsize=ax_label_font)
-    ax2.set_ylabel("$Response$", fontsize=ax_label_font)
-    ax2.legend()
-    
+        
+    plt.title("State-Error vs. Time", fontsize=ax_label_font)
+
+
     ax3 = fig.add_subplot(133)
     ax3.plot(t, U[0,:], '.', color='red', markersize=marker_size, alpha=0.8)
     ax3.plot(t, U[1,:], '.', color='blue', markersize=marker_size, alpha=0.8)
@@ -272,6 +277,8 @@ elif f_plot_option == 3 :
     ax3.grid()
     ax3.set_xlabel("time", fontsize=ax_label_font)
     ax3.set_ylabel("thrust force", fontsize=ax_label_font)
+    plt.title("Thrust vs. Time", fontsize=ax_label_font)
+
 
 # Save and Show 
 if f_save_plot: 
