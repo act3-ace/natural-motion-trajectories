@@ -25,7 +25,7 @@ from ClohessyWiltshire import ClohessyWiltshire
 # Import the Desired Controller from the "controllers" directory 
 from controllers.simple_linear_controller import Controller
 # Import the Desired Measurement Model 
-from MeasurementModel import MeasurementModel
+from MeasurementModels.simple import MeasurementModel
 # Import the Desired Filter from the "filters" directory 
 from filters.ExtendedKalmanFilter import dynamicFilter
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
