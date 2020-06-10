@@ -14,8 +14,13 @@ Assumes: in-plane dynamics
 The optimization problem is solved at each call of the controller 
 
 Key Paramters:
+    self.f_goal_set: specifies the constraint on the final point in the trajectory 
+        = 0 to drive the controller to the origin 
+        = 1 to drive the controller to a stationary point (along y-axis)
     self.total_plan_time: total time to the goal 
         * note: if this is too short, then no feasible solutions will be found 
+          this problem can easily be fixed by adding some number of iterations 
+          to the horizon until a solution is found 
     self.tau0: number of steps in the initial planning horizon
     
 Note: the time period between steps in the planner "self.dt_plan" 
@@ -24,6 +29,8 @@ be decreased as the vehicle approaches the goal
 
 
 TODO: Increase time horizon if first iteration is infeasable 
+TODO: Add safety constraint number 3, defining a position dependent speed limit 
+TODO: regulation to trajectory point once reached 
 
 """
 
@@ -38,17 +45,28 @@ from gurobipy import GRB
 class Controller(SystemParameters): 
     def __init__(self):
         
+        # Options 
+        self.f_goal_set = 1 # 0 for origin, 1 for stationary points 
+        
+        self.total_plan_time = 200 # time to goal [s] 
+        self.tau0 = 200 # number steps in initial planning horizon 
+        
+        
+        # Set up (don't modify )
         self.zero_input = np.zeros([3,1])
         self.trajectory_initialized = False 
-        
-        self.total_plan_time = 50 # time to goal [s] 
-        self.tau0 = 300 # number steps in initial planning horizon 
         
         self.t = np.linspace(0,self.total_plan_time, self.tau0) # time vector 
         self.dt_plan = self.t[1]-self.t[0] # time resolution of solver 
         
         # self.xstar = 0 # optimal trajectory points 
         self.ustar = 0 # optimal control points 
+        
+        if self.f_goal_set == 0: 
+            print("\nDriving chaser to target! \n")
+        elif self.f_goal_set == 1: 
+            print("\nDriving chaser to stationary trajectory! \n")
+
         
         
     def main(self, x0, t):
@@ -82,18 +100,19 @@ class Controller(SystemParameters):
         mc = self.mass_chaser
 
         # Shorten the number of initial time steps (self.tau0) based on the amount of time elapsed        
-        tau = int(max(5, np.round(self.tau0 - t_elapsed/self.dt_plan) ) )
+        tau = int(max(8, np.round(self.tau0 - t_elapsed/self.dt_plan) ) )
         print("time elapsed = ", t_elapsed )
         
         # Set Ranges 
         smax = 10000 # arbitrary (included bounds to speed up solver)
         vmax = 10 # [m/s] max velocity 
-        Fmax = 20 # [N] max force 
+        Fmax = 2 # [N] max force 
         
         
         # Initialize states 
         sx = [] 
-        sy = [] 
+        if self.f_goal_set == 0: 
+            sy = [] 
         vx = [] 
         vy = [] 
         Fx = [] 
@@ -106,7 +125,8 @@ class Controller(SystemParameters):
             sx.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -smax, ub = smax, name="sx"+str(t) )) 
             vx.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -vmax, ub = vmax, name="vx"+str(t) )) 
             Fx.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -Fmax, ub = Fmax, name="Fx"+str(t) )) 
-            sy.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -smax, ub = smax, name="sy"+str(t) )) 
+            if self.f_goal_set == 0: 
+                sy.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -smax, ub = smax, name="sy"+str(t) )) 
             vy.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -vmax, ub = vmax, name="vy"+str(t) )) 
             Fy.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -Fmax, ub = Fmax, name="Fy"+str(t) )) 
         
@@ -114,21 +134,25 @@ class Controller(SystemParameters):
                 
         # Set boundary conditions 
         m.addConstr( sx[0] == initial_state[0] , "sx0")
-        m.addConstr( sy[0] == initial_state[1] , "sy0")
+        if self.f_goal_set == 0: 
+            m.addConstr( sy[0] == initial_state[1] , "sy0")
         m.addConstr( vx[0] == initial_state[3] , "vx0")
         m.addConstr( vy[0] == initial_state[4] , "vy0")
+        
         m.addConstr( sx[-1] == goal_state[0] , "sxf")
-        m.addConstr( sy[-1] == goal_state[1] , "syf")
+        if self.f_goal_set == 0:
+            m.addConstr( sy[-1] == goal_state[1] , "syf")
         m.addConstr( vx[-1] == goal_state[3] , "vxf")
         m.addConstr( vy[-1] == goal_state[4] , "vyf")
-        
+
         
         # Set Dynamics 
         for t in range(tau-1) :
             # Dynamics 
             m.addConstr( sx[t+1] == sx[t] + vx[t]*self.dt_plan , "Dsx_"+str(t))
-            m.addConstr( sy[t+1] == sy[t] + vy[t]*self.dt_plan , "Dsy_"+str(t))
-            m.addConstr( vx[t+1] == vx[t] + sx[t]*3*n**2*self.dt_plan + sy[t]*2*n*self.dt_plan + Fx[t]*(1/mc)*self.dt_plan , "Dvx_"+str(t) )
+            if self.f_goal_set == 0: 
+                m.addConstr( sy[t+1] == sy[t] + vy[t]*self.dt_plan , "Dsy_"+str(t))
+            m.addConstr( vx[t+1] == vx[t] + sx[t]*3*n**2*self.dt_plan + vy[t]*2*n*self.dt_plan + Fx[t]*(1/mc)*self.dt_plan , "Dvx_"+str(t) )
             m.addConstr( vy[t+1] == vy[t] - vx[t]*2*n*self.dt_plan                   + Fy[t]*(1/mc)*self.dt_plan , "Dvy_"+str(t) )
         
         
