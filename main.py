@@ -19,11 +19,12 @@ import random as rand
 import sys 
 from parameters import SystemParameters 
 from ClohessyWiltshire import ClohessyWiltshire
+from mpl_toolkits.mplot3d import Axes3D
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 # Import the Desired Controller from the "controllers" directory 
-from controllers.simple_linear_controller import Controller
+from controllers.LQR_to_origin import Controller
 # Import the Desired Measurement Model 
 from MeasurementModels.simple import MeasurementModel
 # Import the Desired Filter from the "filters" directory 
@@ -36,7 +37,7 @@ from filters.ExtendedKalmanFilter import dynamicFilter
 ##############################################################################
 
 # Flags 
-f_plot_option = 3 # choose 0, 1, 2, or 3 
+f_plot_option = 2 # choose 0, 1, 2, or 3 
 f_save_plot = True # saves a plot at end of simulation 
 
 
@@ -205,22 +206,25 @@ elif f_plot_option == 2 :
     mpl.rc('font', **font)
 
     # Plot results 
-    ax1 = fig.add_subplot(131)
+    ax1 = fig.add_subplot(131, projection='3d')
     ax1.grid()
-    ax1.plot(X[0,:],X[1,:],'.', color='coral', markersize=marker_size, alpha=0.8)
-    ax1.plot(X[0,:],X[1,:], color='blue', linewidth=line_width, alpha=0.6)
-    ax1.plot(X[0,0],X[1,0],'kx')
-    ax1.plot(0,0,'go', alpha=0.5)
+    ax1.plot(X[0,:],X[1,:],X[2,:],'.', color='coral', markersize=marker_size, alpha=0.8)
+    ax1.plot(X[0,:],X[1,:],X[2,:], color='blue', linewidth=line_width, alpha=0.6)
+    # ax1.plot(X[0,0],X[1,0],X[2,0])
+    # ax1.plot(0,0,0,'go', alpha=0.5)
     ax1.set_xlabel("x-position", fontsize=ax_label_font)
     ax1.set_ylabel("y-position", fontsize=ax_label_font)
-    plt.title("In-Plane Trajectory", fontsize=ax_label_font)
+    ax1.set_zlabel("z-position")
+    plt.title("Trajectory", fontsize=ax_label_font)
 
     ax2 = fig.add_subplot(132)
     ax2.grid()
     ax2.plot(t, X[3,:],'.', color='r', markersize=marker_size, alpha=0.2)
     ax2.plot(t, X[4,:],'.', color='b', markersize=marker_size, alpha=0.2)
+    ax2.plot(t, X[5,:],'.', color='g', markersize=marker_size, alpha=0.2)
     ax2.plot(t, X[3,:], color='red', linewidth=line_width, alpha=0.6)
     ax2.plot(t, X[4,:], color='blue', linewidth=line_width, alpha=0.6)
+    ax2.plot(t, X[5,:], color='green', linewidth=line_width, alpha=0.6)
     ax2.set_xlabel("time", fontsize=ax_label_font)
     ax2.set_ylabel("velocity", fontsize=ax_label_font)
     plt.title("Velocity vs. Time", fontsize=ax_label_font)
@@ -235,7 +239,6 @@ elif f_plot_option == 2 :
     ax3.set_xlabel("time", fontsize=ax_label_font)
     ax3.set_ylabel("thrust force", fontsize=ax_label_font)
     plt.title("Thrust vs. Time", fontsize=ax_label_font)
-
 
 elif f_plot_option == 3 :
     # Style plot 
