@@ -9,7 +9,7 @@ constraints:
     (ii) max velocity: xdot, ydot \in [vmin, vmax]
 
 
-Assumes: in-plane dynamics 
+Assumes: Full 3-D translational dynamics  
 
 The optimization problem is solved at each call of the controller 
 
@@ -46,10 +46,10 @@ class Controller(SystemParameters):
     def __init__(self):
         
         # Options 
-        self.f_goal_set = 1 # 0 for origin, 1 for stationary points
+        self.f_goal_set = 2 # 0 for origin, 1 for periodic line, 2 for ellipses 
         
         self.total_plan_time = 200 # time to goal [s] 
-        self.tau0 = 200 # number steps in initial planning horizon 
+        self.tau0 = 100 # number steps in initial planning horizon 
         
         
         # Set up (don't modify )
@@ -111,12 +111,14 @@ class Controller(SystemParameters):
         
         # Initialize states 
         sx = [] 
-        if self.f_goal_set != 1: 
-            sy = [] 
+        sy = [] 
+        sz = [] 
         vx = [] 
         vy = [] 
+        vz = [] 
         Fx = [] 
         Fy = [] 
+        Fz = [] 
         
         m = gp.Model("QPTraj")
         
@@ -125,26 +127,41 @@ class Controller(SystemParameters):
             sx.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -smax, ub = smax, name="sx"+str(t) )) 
             vx.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -vmax, ub = vmax, name="vx"+str(t) )) 
             Fx.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -Fmax, ub = Fmax, name="Fx"+str(t) )) 
-            if self.f_goal_set != 1: 
-                sy.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -smax, ub = smax, name="sy"+str(t) )) 
+            sy.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -smax, ub = smax, name="sy"+str(t) )) 
             vy.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -vmax, ub = vmax, name="vy"+str(t) )) 
             Fy.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -Fmax, ub = Fmax, name="Fy"+str(t) )) 
-        
+            sz.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -smax, ub = smax, name="sz"+str(t) )) 
+            vz.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -vmax, ub = vmax, name="vz"+str(t) )) 
+            Fz.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -Fmax, ub = Fmax, name="Fz"+str(t) ))
+            
+            
         m.update()
                 
         # Set boundary conditions 
         m.addConstr( sx[0] == initial_state[0] , "sx0")
-        if self.f_goal_set != 1: 
-            m.addConstr( sy[0] == initial_state[1] , "sy0")
+        m.addConstr( sy[0] == initial_state[1] , "sy0")
+        m.addConstr( sz[0] == initial_state[2] , "sz0")
         m.addConstr( vx[0] == initial_state[3] , "vx0")
         m.addConstr( vy[0] == initial_state[4] , "vy0")
+        m.addConstr( vz[0] == initial_state[5] , "vz0")
         
-        if self.f_goal_set == 0 or self.f_goal_set == 1:  # origin or stationary point 
+        if self.f_goal_set == 0: # origin 
             m.addConstr( sx[-1] == goal_state[0] , "sxf")
-            if self.f_goal_set != 1:
-                m.addConstr( sy[-1] == goal_state[1] , "syf")
+            m.addConstr( sy[-1] == goal_state[1] , "syf")
+            m.addConstr( sz[-1] == goal_state[2] , "szf")
             m.addConstr( vx[-1] == goal_state[3] , "vxf")
             m.addConstr( vy[-1] == goal_state[4] , "vyf")
+            m.addConstr( vz[-1] == goal_state[5] , "vzf")
+        elif self.f_goal_set == 1: # stationary point or periodic line 
+            m.addConstr( sx[-1] == goal_state[0] , "sxf")
+            m.addConstr( vx[-1] == goal_state[3] , "vxf")
+            m.addConstr( vy[-1] == goal_state[4] , "vyf")
+        elif self.f_goal_set == 2: # ellipse 
+            m.addConstr( vy[-1] + 2*n*sx[-1] == 0, "ellipse1" )
+            m.addConstr( sy[-1] - (2/n)*vx[-1] == 0, "ellipse2" )
+            # m.addConstr( sx[-1] - sz[-1] == 0 )
+            # m.addConstr( sz[-1] - vx[-1] == 0 )
+            # m.addConstr( vx[-1] - vz[-1] == 0 )
             
             
         
@@ -152,16 +169,16 @@ class Controller(SystemParameters):
         for t in range(tau-1) :
             # Dynamics 
             m.addConstr( sx[t+1] == sx[t] + vx[t]*self.dt_plan , "Dsx_"+str(t))
-            if self.f_goal_set != 1: 
-                m.addConstr( sy[t+1] == sy[t] + vy[t]*self.dt_plan , "Dsy_"+str(t))
+            m.addConstr( sy[t+1] == sy[t] + vy[t]*self.dt_plan , "Dsy_"+str(t))
+            m.addConstr( sz[t+1] == sz[t] + vz[t]*self.dt_plan , "Dsz_"+str(t))
             m.addConstr( vx[t+1] == vx[t] + sx[t]*3*n**2*self.dt_plan + vy[t]*2*n*self.dt_plan + Fx[t]*(1/mc)*self.dt_plan , "Dvx_"+str(t) )
-            m.addConstr( vy[t+1] == vy[t] - vx[t]*2*n*self.dt_plan                   + Fy[t]*(1/mc)*self.dt_plan , "Dvy_"+str(t) )
-        
+            m.addConstr( vy[t+1] == vy[t] - vx[t]*2*n*self.dt_plan + Fy[t]*(1/mc)*self.dt_plan , "Dvy_"+str(t) )
+            m.addConstr( vz[t+1] == vz[t] + (-n**2)*sz[t]*self.dt_plan     + Fz[t]*(1/mc)*self.dt_plan , "Dvz_"+str(t) )
         
         # Set Objective ( minimize: sum(Fx^2 + Fy^2) )
-        obj = Fx[0]*Fx[0] + Fy[0]*Fy[0]
+        obj = Fx[0]*Fx[0] + Fy[0]*Fy[0] + Fx[0]*Fz[0]
         for t in range(0, tau):
-            obj = obj + Fx[t]*Fx[t] + Fy[t]*Fy[t]
+            obj = obj + Fx[t]*Fx[t] + Fy[t]*Fy[t] + Fz[t]*Fz[t]
         
         
         
@@ -183,5 +200,6 @@ class Controller(SystemParameters):
             # self.xstar[4,t] = m.getVarByName("vy"+str(t)).x
             self.ustar[0,t] = m.getVarByName("Fx"+str(t)).x
             self.ustar[1,t] = m.getVarByName("Fy"+str(t)).x
+            self.ustar[2,t] = m.getVarByName("Fz"+str(t)).x
         
         
