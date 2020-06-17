@@ -44,8 +44,8 @@ f_save_plot = True # saves a plot at end of simulation
 f_use_RTA_filter = True # filters the controllers input to ensure safety 
 
 # Parameters 
-T  = 500 # total simulation time [s]
-Nsteps = 600 # number steps in simulation time horizon 
+T  = 100 # total simulation time [s]
+Nsteps = 400 # number steps in simulation time horizon 
 
 dim_state = 6; 
 dim_control = 3; 
@@ -250,6 +250,20 @@ elif f_plot_option == 2 :
     ax3.set_xlabel("time", fontsize=ax_label_font)
     ax3.set_ylabel("thrust force", fontsize=ax_label_font)
     plt.title("Thrust vs. Time", fontsize=ax_label_font)
+    
+    ax4 = fig.add_subplot(224, projection='3d')
+    ax4.grid()
+    vmag = (X[3,:]**2 + X[4,:]**2)**(0.5)
+    ax4.plot( X[0,:], X[1,:], vmag )
+    x = np.arange(-8, 8, 0.25)
+    y = np.arange(-8, 8, 0.25)
+    x, y = np.meshgrid(x, y)
+    R = np.sqrt(asif.K)*np.sqrt(x**2 + y**2)
+    z = R 
+    
+    # Plot the surface.
+    surf = ax4.plot_surface(x,y,z, cmap=mpl.cm.coolwarm, linewidth=0, antialiased=False, alpha=.3)
+    
 
 elif f_plot_option == 3 :
     # Style plot 

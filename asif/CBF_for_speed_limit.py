@@ -18,7 +18,7 @@ from gurobipy import GRB
 class ASIF(SystemParameters): 
     def __init__(self):
         
-        safety_factor = 500
+        safety_factor = 200
         self.Fmax = self.max_available_thrust 
         mass = self.mass_chaser 
         
@@ -87,11 +87,11 @@ class ASIF(SystemParameters):
                 
         # Set boundary conditions 
         b = alpha_hs + sigma
-        m.addConstr( etax*Fx[0] + etay*Fy[0] + dist_out_of_bounds[0] >= -b , "sx0")
-        
+        m.addConstr( etax*Fx[0] + etay*Fy[0] + dist_out_of_bounds[0] >= -b  , "BC")
+        # m.addConstr( dist_out_of_bounds[0] == 0 )
         
         # Set Objective
-        obj = Fx[0]*Fx[0] + Fy[0]*Fy[0] - 2*Fx_des*Fx[0] - 2*Fy_des*Fy[0] + 100000*dist_out_of_bounds[0]
+        obj = Fx[0]*Fx[0] + Fy[0]*Fy[0] - 2*Fx_des*Fx[0] - 2*Fy_des*Fy[0] + 10000*dist_out_of_bounds[0]
 
 
         m.setObjective(obj, GRB.MINIMIZE)
@@ -154,6 +154,7 @@ class ASIF(SystemParameters):
         
     
     def alpha(self, x):
-        return x
+        print("x = ", x)
+        return  1000*x**3
         
         
