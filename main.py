@@ -30,7 +30,7 @@ from MeasurementModels.simple import MeasurementModel
 # Import the Desired Filter from the "filters" directory 
 from filters.ExtendedKalmanFilter import dynamicFilter
 # Import Active Set Invariance Filter (ASIF) (aka RTA mechanism)
-from asif.template_filter import ASIF
+from asif.CBF_for_speed_limit import ASIF
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
 
@@ -203,7 +203,7 @@ elif f_plot_option == 2 :
     # Style plot 
     marker_size = 1.5
     line_width = 1.25
-    fig = plt.figure(figsize=(20,5))
+    fig = plt.figure(figsize=(10,10))
     axis_font = 9
     ax_label_font = 11
     font = {'family' : 'normal',
@@ -212,10 +212,13 @@ elif f_plot_option == 2 :
     mpl.rc('font', **font)
 
     # Plot results 
-    ax1 = fig.add_subplot(131, projection='3d')
+    ax1 = fig.add_subplot(221, projection='3d')
     ax1.grid()
     ax1.plot(X[0,:],X[1,:],X[2,:],'.', color='coral', markersize=marker_size, alpha=0.8)
     ax1.plot(X[0,:],X[1,:],X[2,:], color='blue', linewidth=line_width, alpha=0.6)
+    ax1.set_xlim( [-8, 8] )
+    ax1.set_ylim( [-8, 8] )
+    ax1.set_zlim( [-8, 8] )
     # ax1.plot(X[0,0],X[1,0],X[2,0])
     # ax1.plot(0,0,0,'go', alpha=0.5)
     ax1.set_xlabel("x-position", fontsize=ax_label_font)
@@ -223,7 +226,7 @@ elif f_plot_option == 2 :
     ax1.set_zlabel("z-position")
     plt.title("Trajectory", fontsize=ax_label_font)
 
-    ax2 = fig.add_subplot(132)
+    ax2 = fig.add_subplot(222)
     ax2.grid()
     ax2.plot(t, X[3,:],'.', color='r', markersize=marker_size, alpha=0.2)
     ax2.plot(t, X[4,:],'.', color='b', markersize=marker_size, alpha=0.2)
@@ -236,11 +239,13 @@ elif f_plot_option == 2 :
     plt.title("Velocity vs. Time", fontsize=ax_label_font)
 
     
-    ax3 = fig.add_subplot(133)
+    ax3 = fig.add_subplot(223)
     ax3.plot(t, U[0,:], '.', color='red', markersize=marker_size, alpha=0.8)
     ax3.plot(t, U[1,:], '.', color='blue', markersize=marker_size, alpha=0.8)
+    ax3.plot(t, U[2,:], '.', color='green', markersize=marker_size, alpha=0.8)
     ax3.plot(t, U[0,:], color='red', linewidth=line_width, alpha=0.2)
     ax3.plot(t, U[1,:], color='blue', linewidth=line_width, alpha=0.2)
+    ax3.plot(t, U[2,:], color='green', linewidth=line_width, alpha=0.2)
     ax3.grid()
     ax3.set_xlabel("time", fontsize=ax_label_font)
     ax3.set_ylabel("thrust force", fontsize=ax_label_font)
