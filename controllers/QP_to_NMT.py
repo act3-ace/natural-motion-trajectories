@@ -46,9 +46,9 @@ class Controller(SystemParameters):
     def __init__(self):
         
         # Options 
-        self.f_goal_set = 2 # 0 for origin, 1 for periodic line, 2 for ellipses 
+        self.f_goal_set = 0 # 0 for origin, 1 for periodic line, 2 for ellipses 
         
-        self.total_plan_time = 200 # time to goal [s] 
+        self.total_plan_time = 100 # time to goal [s] 
         self.tau0 = 100 # number steps in initial planning horizon 
         
         
@@ -176,7 +176,7 @@ class Controller(SystemParameters):
             m.addConstr( vz[t+1] == vz[t] + (-n**2)*sz[t]*self.dt_plan     + Fz[t]*(1/mc)*self.dt_plan , "Dvz_"+str(t) )
         
         # Set Objective ( minimize: sum(Fx^2 + Fy^2) )
-        obj = Fx[0]*Fx[0] + Fy[0]*Fy[0] + Fx[0]*Fz[0]
+        obj = Fx[0]*Fx[0] + Fy[0]*Fy[0] + Fz[0]*Fz[0]
         for t in range(0, tau):
             obj = obj + Fx[t]*Fx[t] + Fy[t]*Fy[t] + Fz[t]*Fz[t]
         

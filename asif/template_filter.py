@@ -55,6 +55,13 @@ class ASIF(SystemParameters):
         u = u_des 
         
         return u
+    
+    def h_s(self, x):
+        """
+        h_s(x) >= 0 defines the set of all "safe states". The goal of the ASIF 
+        is to ensure that this constraint remains satisfied 
+        
+        """
         
         
         

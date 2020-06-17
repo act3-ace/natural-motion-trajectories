@@ -17,7 +17,7 @@ the "main" function.
 import numpy as np 
 import os, sys, inspect
 sys.path.insert(0,os.path.dirname(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))) # add parent directory to path  
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utilities'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utilities')) # add utilities to path 
 from parameters import SystemParameters 
 
 
