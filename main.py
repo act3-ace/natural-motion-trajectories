@@ -200,6 +200,12 @@ elif f_plot_option == 1 :
     ax2.set_ylabel("velocity", fontsize=ax_label_font)
     
 elif f_plot_option == 2 :
+    try:
+        f_speed_limit_const = asif.safety_constraint # 0 for none, 1 right cone, or 2 for other cone  
+    except: 
+        f_speed_limit_const = 0 
+    
+    
     # Style plot 
     marker_size = 1.5
     line_width = 1.25
@@ -226,7 +232,7 @@ elif f_plot_option == 2 :
     ax1.set_zlabel("z-position")
     plt.title("Trajectory", fontsize=ax_label_font)
 
-    ax2 = fig.add_subplot(222)
+    ax2 = fig.add_subplot(224)
     ax2.grid()
     ax2.plot(t, X[3,:],'.', color='r', markersize=marker_size, alpha=0.2)
     ax2.plot(t, X[4,:],'.', color='b', markersize=marker_size, alpha=0.2)
@@ -251,19 +257,26 @@ elif f_plot_option == 2 :
     ax3.set_ylabel("thrust force", fontsize=ax_label_font)
     plt.title("Thrust vs. Time", fontsize=ax_label_font)
     
-    ax4 = fig.add_subplot(224, projection='3d')
+    ax4 = fig.add_subplot(222, projection='3d')
+    plt.title("Position vs Speed")
     ax4.grid()
     vmag = (X[3,:]**2 + X[4,:]**2)**(0.5)
     ax4.plot( X[0,:], X[1,:], vmag )
-    x = np.arange(-8, 8, 0.25)
-    y = np.arange(-8, 8, 0.25)
-    x, y = np.meshgrid(x, y)
-    R = np.sqrt(asif.K)*np.sqrt(x**2 + y**2)
-    z = R 
-    
+    if f_speed_limit_const >= 0.5:
+        x = np.arange(-8, 8, 0.25)
+        y = np.arange(-8, 8, 0.25)
+        x, y = np.meshgrid(x, y)
+        R = np.sqrt(asif.K)*np.sqrt(x**2 + y**2)
+        z = R 
+    ax4.set_xlabel("x-position", fontsize=ax_label_font)
+    ax4.set_ylabel("y-position", fontsize=ax_label_font)
+    ax4.set_zlabel("velocity magnitude", fontsize=ax_label_font)
+
     # Plot the surface.
-    surf = ax4.plot_surface(x,y,z, cmap=mpl.cm.coolwarm, linewidth=0, antialiased=False, alpha=.3)
-    
+    if f_speed_limit_const == 1: 
+        surf = ax4.plot_surface(x,y,z, cmap=mpl.cm.coolwarm, linewidth=0, antialiased=False, alpha=.3)
+    elif f_speed_limit_const == 2: 
+        surf = ax4.plot_surface(x,y,np.sqrt(z), cmap=mpl.cm.coolwarm, linewidth=0, antialiased=False, alpha=.3)
 
 elif f_plot_option == 3 :
     # Style plot 

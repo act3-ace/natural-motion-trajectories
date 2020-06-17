@@ -3,7 +3,9 @@
 """
 @author: Mark
 
-Applies to in-plane dynamics 
+Applies to in-plane dynamics
+
+v2 version changes safety set (speed limit cone) 
 
 """
 
@@ -18,9 +20,9 @@ from gurobipy import GRB
 class ASIF(SystemParameters): 
     def __init__(self):
         
-        self.safety_constraint = 1 
+        self.safety_constraint = 2
         
-        safety_factor = 200
+        safety_factor = 5000
         self.Fmax = self.max_available_thrust 
         mass = self.mass_chaser 
         
@@ -135,7 +137,7 @@ class ASIF(SystemParameters):
         sy = x[1,0] # y-position
         vx = x[2,0] # x-velocity
         vy = x[3,0] # y-velocity 
-        val = self.K*(sx**2 + sy**2) - vx**2 - vy**2 
+        val = self.K*(sx**2 + sy**2) - (vx**2 + vy**2)**2 
         
         return val 
     
@@ -150,13 +152,13 @@ class ASIF(SystemParameters):
         vx = x[2,0] # x-velocity
         vy = x[3,0] # y-velocity 
         
-        nabla_hs = np.array([ 2*self.K*sx, 2*self.K*sy, -2*vx, -2*vy ])
+        nabla_hs = np.array([ 2*self.K*sx, 2*self.K*sy, -4*(vx**3 + vx*vy**2), -4*(vy**3 + vy*vx**2) ])
         
         return nabla_hs
         
     
     def alpha(self, x):
         # print("x = ", x)
-        return  1000*x**3
+        return  50000*x**5
         
         
