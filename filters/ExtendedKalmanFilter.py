@@ -58,7 +58,7 @@ class dynamicFilter(SystemParameters, ClohessyWiltshire):
         # Define Measurement Parameters
         self.R = MeasurementModel.R
         self.Q = MeasurementModel.Q
-        self.H = MeasurementModel.H
+        self.H = MeasurementModel.BuildMeasureJacob(meas_state)
         
         # Prediction Step
         x_pred, P_pred = predict(self, est_state, P, u, dt)
