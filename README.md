@@ -15,4 +15,4 @@ System parameters are specified in _parameters.py_. The simulation is run via th
 ## Directories 
 
 ### _controllers_ 
-Controllers map the state and time to a desired input force. Each controller is implemented as a class, with a special _main_ method that is called in the loop; do not modify the inputs or outputs of this method. Each controller class is named "Controller" and given its own script. f
+Controllers map the state and time to a desired input force. Each controller is implemented as a class, with a special _main_ method that is called in the loop; do not modify the inputs or outputs of this method. Each controller class is named "Controller" and given its own script.
