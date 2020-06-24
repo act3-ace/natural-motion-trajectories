@@ -39,8 +39,8 @@ class Controller(SystemParameters):
                   [0, 0, 1/mass_chaser]])
         
         # Specify LQR gains 
-        Q = np.multiply(10,np.eye(6))   # State cost 
-        R = np.multiply(100,np.eye(3))   # Control cost 
+        Q = np.multiply(.010,np.eye(6))   # State cost 
+        R = np.multiply(10000,np.eye(3))   # Control cost 
         
         # Calculate LQR Cost 
         self.Klqr = -misc.get_lqr_gain(A, B, Q, R)
