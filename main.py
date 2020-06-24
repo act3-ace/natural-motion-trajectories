@@ -24,7 +24,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 # Import the Desired Controller from the "controllers" directory 
-from controllers.LQR_to_origin import Controller
+from controllers.template_controller import Controller
 # Import the Desired Measurement Model 
 from MeasurementModels.simple import MeasurementModel
 # Import the Desired Filter from the "filters" directory 
@@ -41,11 +41,11 @@ from asif.CBF_for_speed_limit import ASIF
 # Flags 
 f_plot_option = 2 # choose 0, 1, 2, or 3 
 f_save_plot = True # saves a plot at end of simulation 
-f_use_RTA_filter = True # filters the controllers input to ensure safety 
+f_use_RTA_filter = False # filters the controllers input to ensure safety 
 
 # Parameters 
-T  = 100 # total simulation time [s]
-Nsteps = 400 # number steps in simulation time horizon 
+T  = 5000 # total simulation time [s]
+Nsteps = T # number steps in simulation time horizon 
 
 dim_state = 6; 
 dim_control = 3; 
@@ -56,8 +56,8 @@ Fmax = sys_data.max_available_thrust # [N]
 T_sample = sys_data.controller_sample_period # [s]
 
 # Initial Values
-x = 5
-x_dot = 0.005
+x = 4000 # [m]
+x_dot = 0.005 
 x0 = np.array([[x],  # x
                [2/mean_motion*x_dot],  # y 
                [0],  # z
@@ -69,7 +69,7 @@ u0 = np.array([[0],  # Fx
                [0]]) # Fz
 
 # Setup filter paramters
-x_hat = x0+np.array([[rand.random()-0.5],
+x_hat = x0 + np.array([[rand.random()-0.5],
                     [rand.random()-0.5],
                     [0],
                     [0],
@@ -166,8 +166,8 @@ if f_plot_option == 0 :
     plt.plot(X[0,:],X[1,:],'.', color='coral', markersize=marker_size, alpha=0.8)
     plt.plot(X[0,:],X[1,:], color='blue', linewidth=line_width, alpha=0.6)
     plt.plot(X[0,0],X[1,0],'kx')
-    plt.xlim([-10, 10])
-    plt.ylim([-10, 10])
+    plt.xlim([-10000, 10000])
+    plt.ylim([-10000, 10000])
     
 elif f_plot_option == 1 :
     # Style plot 
@@ -204,7 +204,8 @@ elif f_plot_option == 2 :
         f_speed_limit_const = asif.safety_constraint # 0 for none, 1 right cone, or 2 for other cone  
     except: 
         f_speed_limit_const = 0 
-    
+    if not f_use_RTA_filter:
+        f_speed_limit_const = 0 
     
     # Style plot 
     marker_size = 1.5
@@ -222,9 +223,10 @@ elif f_plot_option == 2 :
     ax1.grid()
     ax1.plot(X[0,:],X[1,:],X[2,:],'.', color='coral', markersize=marker_size, alpha=0.8)
     ax1.plot(X[0,:],X[1,:],X[2,:], color='blue', linewidth=line_width, alpha=0.6)
-    ax1.set_xlim( [-8, 8] )
-    ax1.set_ylim( [-8, 8] )
-    ax1.set_zlim( [-8, 8] )
+    K = 8000
+    ax1.set_xlim( [-K, K] )
+    ax1.set_ylim( [-K, K] )
+    ax1.set_zlim( [-K, K] )
     # ax1.plot(X[0,0],X[1,0],X[2,0])
     # ax1.plot(0,0,0,'go', alpha=0.5)
     ax1.set_xlabel("x-position", fontsize=ax_label_font)
@@ -261,13 +263,17 @@ elif f_plot_option == 2 :
     plt.title("Position vs Speed")
     ax4.grid()
     vmag = (X[3,:]**2 + X[4,:]**2)**(0.5)
-    ax4.plot( X[0,:], X[1,:], vmag )
+    ax4.plot( X[0,:], X[1,:], vmag, 'r' )
+    K2 = 5000
     if f_speed_limit_const >= 0.5:
-        x = np.arange(-8, 8, 0.25)
-        y = np.arange(-8, 8, 0.25)
+        x = np.arange(-K2, K2, 10)
+        y = np.arange(-K2, K2, 10)
         x, y = np.meshgrid(x, y)
         R = np.sqrt(asif.K)*np.sqrt(x**2 + y**2)
-        z = R 
+        z = R
+    ax4.set_xlim( [-K, K] )
+    ax4.set_ylim( [-K, K] )
+    ax4.set_zlim( [0, 15] )
     ax4.set_xlabel("x-position", fontsize=ax_label_font)
     ax4.set_ylabel("y-position", fontsize=ax_label_font)
     ax4.set_zlabel("velocity magnitude", fontsize=ax_label_font)
