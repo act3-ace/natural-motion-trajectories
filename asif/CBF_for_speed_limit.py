@@ -20,7 +20,7 @@ class ASIF(SystemParameters):
         
         self.safety_constraint = 1 
         
-        safety_factor = 200
+        safety_factor = 18000 # 200
         self.Fmax = self.max_available_thrust 
         mass = self.mass_chaser 
         
@@ -157,6 +157,6 @@ class ASIF(SystemParameters):
     
     def alpha(self, x):
         # print("x = ", x)
-        return  1000*x**3
+        return  .0002*x**3
         
         

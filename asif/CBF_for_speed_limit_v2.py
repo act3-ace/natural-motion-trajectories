@@ -22,7 +22,7 @@ class ASIF(SystemParameters):
         
         self.safety_constraint = 2
         
-        safety_factor = 5000
+        safety_factor = 150
         self.Fmax = self.max_available_thrust 
         mass = self.mass_chaser 
         
