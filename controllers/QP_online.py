@@ -46,10 +46,10 @@ class Controller(SystemParameters):
     def __init__(self):
         
         # Options 
-        self.f_goal_set = 1 # 0 for origin, 1 for stationary points
+        self.f_goal_set = 0 # 0 for origin, 1 for stationary points
         
-        self.total_plan_time = 200 # time to goal [s] 
-        self.tau0 = 200 # number steps in initial planning horizon 
+        self.total_plan_time = 6000 # time to goal [s] 
+        self.tau0 = 300 # number steps in initial planning horizon 
         
         
         # Set up (don't modify )
@@ -100,13 +100,14 @@ class Controller(SystemParameters):
         mc = self.mass_chaser
 
         # Shorten the number of initial time steps (self.tau0) based on the amount of time elapsed        
-        tau = int(max(8, np.round(self.tau0 - t_elapsed/self.dt_plan) ) )
+        tau = int(max(10, np.ceil(self.tau0 - t_elapsed/self.dt_plan) ) )
         print("time elapsed = ", t_elapsed )
+        print("tau = ", tau)
         
         # Set Ranges 
-        smax = 10000 # arbitrary (included bounds to speed up solver)
+        smax = 15000 # arbitrary (included bounds to speed up solver)
         vmax = 10 # [m/s] max velocity 
-        Fmax = 2 # [N] max force 
+        Fmax = 2  # [N] max force 
         
         
         # Initialize states 

@@ -48,8 +48,8 @@ class Controller(SystemParameters):
         # Options 
         self.f_goal_set = 0 # 0 for origin, 1 for periodic line, 2 for ellipses 
         
-        self.total_plan_time = 100 # time to goal [s] 
-        self.tau0 = 100 # number steps in initial planning horizon 
+        self.total_plan_time = 6000 # time to goal [s] 
+        self.tau0 = 300 # number steps in initial planning horizon 
         
         
         # Set up (don't modify )
@@ -104,7 +104,7 @@ class Controller(SystemParameters):
         print("time elapsed = ", t_elapsed )
         
         # Set Ranges 
-        smax = 10000 # arbitrary (included bounds to speed up solver)
+        smax = 15000 # arbitrary (included bounds to speed up solver)
         vmax = 10 # [m/s] max velocity 
         Fmax = 2 # [N] max force 
         
