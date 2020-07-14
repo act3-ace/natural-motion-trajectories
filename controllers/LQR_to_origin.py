@@ -40,14 +40,17 @@ class Controller(SystemParameters):
         
         # Specify LQR gains 
         Q = np.multiply(.010,np.eye(6))   # State cost 
-        R = np.multiply(10000,np.eye(3))   # Control cost 
+        R = np.multiply(100000,np.eye(3))   # Control cost 
         
         # Calculate LQR Cost 
         self.Klqr = -misc.get_lqr_gain(A, B, Q, R)
                 
         
     def main(self, x0, t):
-        return np.matmul(self.Klqr,x0).reshape(3,1)
+        xd = np.array([0, -4000, 0, 0, 0, 0])
+        # print(x0)
+        # print(xd)
+        return np.matmul(self.Klqr,x0-xd).reshape(3,1)
         
     
     

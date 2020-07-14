@@ -46,9 +46,9 @@ class Controller(SystemParameters):
     def __init__(self):
         
         # Options 
-        self.f_goal_set = 0 # 0 for origin, 1 for stationary points
+        self.f_goal_set = 1 # 0 for origin, 1 for stationary points
         
-        self.total_plan_time = 6000 # time to goal [s] 
+        self.total_plan_time = 2000 # time to goal [s] 
         self.tau0 = 300 # number steps in initial planning horizon 
         
         
@@ -79,7 +79,7 @@ class Controller(SystemParameters):
         try: 
             self.calculate_trajectory(x0, t) # finds traj starting at x0 
         except: 
-            print("\nFailed to find trajectory at t = "+str(t))
+            print("\n\n~~~Failed to find trajectory at t = "+str(t),"~~~\n\n")
         
         
         u = self.ustar[:,0]
@@ -93,7 +93,7 @@ class Controller(SystemParameters):
         control inputs (self.ustar)
 
         """
-        
+
         initial_state = x0.reshape(6)
         goal_state = np.zeros(6)
         n  = self.mean_motion
@@ -118,9 +118,9 @@ class Controller(SystemParameters):
         vy = [] 
         Fx = [] 
         Fy = [] 
-        
+
         m = gp.Model("QPTraj")
-        
+
         # Define variables at each of the tau timesteps 
         for t in range(tau) : 
             sx.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -smax, ub = smax, name="sx"+str(t) )) 
@@ -167,7 +167,7 @@ class Controller(SystemParameters):
         
         
         m.setObjective(obj, GRB.MINIMIZE)
-        m.setParam( 'OutputFlag', False )
+        m.setParam( 'OutputFlag', True )
         
         # Optimize and report on results 
         m.optimize()

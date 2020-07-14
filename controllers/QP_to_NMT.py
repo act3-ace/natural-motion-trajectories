@@ -46,9 +46,9 @@ class Controller(SystemParameters):
     def __init__(self):
         
         # Options 
-        self.f_goal_set = 0 # 0 for origin, 1 for periodic line, 2 for ellipses 
+        self.f_goal_set = 2 # 0 for origin, 1 for periodic line, 2 for ellipses
         
-        self.total_plan_time = 6000 # time to goal [s] 
+        self.total_plan_time = 3000 # time to goal [s] 
         self.tau0 = 300 # number steps in initial planning horizon 
         
         
@@ -79,8 +79,11 @@ class Controller(SystemParameters):
         try: 
             self.calculate_trajectory(x0, t) # finds traj starting at x0 
         except: 
-            print("\nFailed to find trajectory at t = "+str(t))
-        
+            try: 
+                self.tau0 = self.tau0 + 20
+                self.calculate_trajectory(x0, t) # finds traj starting at x0 
+            except:
+                print("\nFailed to find trajectory at t = "+str(t),"\n")
         
         u = self.ustar[:,0]
             
@@ -100,7 +103,7 @@ class Controller(SystemParameters):
         mc = self.mass_chaser
 
         # Shorten the number of initial time steps (self.tau0) based on the amount of time elapsed        
-        tau = int(max(8, np.round(self.tau0 - t_elapsed/self.dt_plan) ) )
+        tau = int(max(10, np.round(self.tau0 - t_elapsed/self.dt_plan) ) )
         print("time elapsed = ", t_elapsed )
         
         # Set Ranges 
@@ -159,6 +162,8 @@ class Controller(SystemParameters):
         elif self.f_goal_set == 2: # ellipse 
             m.addConstr( vy[-1] + 2*n*sx[-1] == 0, "ellipse1" )
             m.addConstr( sy[-1] - (2/n)*vx[-1] == 0, "ellipse2" )
+            # m.addConstr( vy[-1] + + 2*n*sx[-1] + sy[-1] - (2/n)*vx[-1] == 0   )
+            
             # m.addConstr( sx[-1] - sz[-1] == 0 )
             # m.addConstr( sz[-1] - vx[-1] == 0 )
             # m.addConstr( vx[-1] - vz[-1] == 0 )
