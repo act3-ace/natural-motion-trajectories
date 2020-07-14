@@ -16,3 +16,7 @@ System parameters are specified in _parameters.py_. The simulation is run via th
 
 ### _controllers_ 
 Controllers map the state and time to a desired input force. Each controller is implemented as a class, with a special _main_ method that is called in the loop; do not modify the inputs or outputs of this method. Each controller class is named "Controller" and given its own script.
+
+
+## Dependencies 
+- Many of the _controller_ and _asif_ modules require optimization to be performed with Gurobi. Installation of Gurobi with Anaconda can be done according to: https://www.gurobi.com/gurobi-and-anaconda-for-linux/. You may request a free licence at https://www.gurobi.com/academia/academic-program-and-licenses/
