@@ -20,6 +20,7 @@ import sys
 from parameters import SystemParameters 
 from ClohessyWiltshire import ClohessyWiltshire
 from mpl_toolkits.mplot3d import Axes3D
+from utilities.misc import probViolation
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
@@ -39,9 +40,10 @@ from asif.CBF_for_speed_limit import ASIF
 ##############################################################################
 
 # Flags 
-f_plot_option = 2 # choose 0, 1, 2, or 3 
+f_plot_option = 4 # choose 0, 1, 2, or 3 
 f_save_plot = True # saves a plot at end of simulation 
 f_use_RTA_filter = False # filters the controllers input to ensure safety 
+adaptiveMeasurement = True # True or False; False sets to default measurement frequency
 
 # Parameters 
 T  = 5000 # total simulation time [s]
@@ -54,10 +56,11 @@ mean_motion = sys_data.mean_motion
 mass_chaser = sys_data.mass_chaser # [kg]
 Fmax = sys_data.max_available_thrust # [N]
 T_sample = sys_data.controller_sample_period # [s]
+T_meas = sys_data.filter_sample_period # [s]
 
 # Initial Values
-x = 4000 # [m]
-x_dot = 0.005 
+x = 10 # [m]
+x_dot = 0 
 x0 = np.array([[x],  # x
                [2/mean_motion*x_dot],  # y 
                [0],  # z
@@ -69,14 +72,14 @@ u0 = np.array([[0],  # Fx
                [0]]) # Fz
 
 # Setup filter paramters
-x_hat = x0 + np.array([[rand.random()-0.5],
-                    [rand.random()-0.5],
+x_hat = x0 + np.array([[rand.random()],
+                    [rand.random()],
                     [0],
                     [0],
                     [0],
                     [0]])
 
-P = np.identity(6)
+P0 = np.identity(6)
 
 
 ##############################################################################
@@ -89,22 +92,33 @@ X = np.zeros([dim_state, Nsteps]) # state at each time
 U = np.zeros([dim_control, Nsteps]) # control at each time 
 X_hat = np.zeros([dim_state, Nsteps]) # state estimate at each time step
 state_error = np.zeros([dim_state, Nsteps]) # State error at each time step
+P = np.zeros([dim_state, dim_state, Nsteps]) # Covariance Matrix
 X_meas = np.zeros([dim_state, Nsteps])
 dt = t[1]-t[0]
 X[:,0]=x0.reshape(dim_state)
 X_hat[:,0] = x_hat.reshape(dim_state)
 state_error[:,0] = X_hat[:,0]-X[:,0] # state error at initial time step
+P[:,:,0] = P0 # Covariance at initial time step
 controller = Controller() # Initialize Controller class 
 asif = ASIF() # Initialize ASIF class 
 filterScheme = dynamicFilter() # Initialize filter class
 takeMeasurement = MeasurementModel() # Define Measurement Model
 X_meas[:,0] = takeMeasurement.MeasureFcn(X[:,0])
-
+violation_probability = np.zeros([Nsteps-1])
 
 steps_per_sample = np.max([1, np.round(T_sample/dt)])
 effective_controller_period = steps_per_sample*dt 
+
+steps_per_meas = np.max([1, np.round(T_meas/dt)])
+measurement_period = steps_per_meas*dt
+
+# Setup Safety Distances
+delta_min = 1
+delta_max = 20
+
 print("\nSimulating with time resolution "+"{:.2f}".format(dt)+
-      " s and controller period "+"{:.2f}".format(effective_controller_period)+" s \n")
+      " s and controller period "+"{:.2f}".format(effective_controller_period)+" s"+ 
+      " and measurement period "+"{:.2f}".format(measurement_period)+" s \n")
 
 # Iterate over time horizon 
 for i in range(1,Nsteps):
@@ -131,13 +145,34 @@ for i in range(1,Nsteps):
     xdot = ClohessyWiltshire.CW(X[:,i-1].reshape(dim_state,1) , u)*dt
     X[:,i] = X[:,i-1] + xdot.reshape(dim_state)
 
+    # Compute Violation Probability====================================================
+    # Only measure if uncertainty is high enough
+    # Still need to translate to python
+    violation_probability[i-1] = probViolation(X_hat[:,i-1], P[:,:,i-1], delta_min, delta_max)
+    #print(violation_probability[i-1])
+    #==================================================================================
+
     # Compute Measurement
-    x_meas = MeasurementModel.MeasureFcn(X[:,i])
-    X_meas[:,i] = x_meas
-    x_meas = x_meas.reshape(dim_state,1)
+    if adaptiveMeasurement:
+        if violation_probability[i-1] <= 0.95:
+            x_meas = MeasurementModel.MeasureFcn(X[:,i])
+            X_meas[:,i] = x_meas
+            x_meas = x_meas.reshape(dim_state,1)
+            print("Measurement taken at index"+"{:f}".format(i-1))
+        else:
+            x_meas = 'NA'
+    else:
+        if (i-1)%steps_per_meas==0:
+            x_meas = MeasurementModel.MeasureFcn(X[:,i])
+            X_meas[:,i] = x_meas
+            x_meas = x_meas.reshape(dim_state,1)
+            print("Measurement taken at index"+"{:f}".format(i-1))          
+        else:
+            x_meas = 'NA'        
+
 
     # Run Filter
-    x_hat, P = filterScheme.main(x_hat, x_meas, P, u, dt, MeasurementModel)
+    x_hat, P[:,:,i] = filterScheme.main(x_hat, x_meas, P[:,:,i-1], u, dt, MeasurementModel)
     X_hat[:,i] = x_hat.reshape(dim_state)
 
     # Calculate state error
@@ -295,46 +330,87 @@ elif f_plot_option == 3 :
             'weight' : 'bold',
             'size'   : axis_font}
     mpl.rc('font', **font)
+    an = np.linspace(0, 2*np.pi, len(t)) # Parametrize angles for plotting circle
 
     # Plot results 
     ax1 = fig.add_subplot(131)
     ax1.grid()
-    ax1.plot(X[0,:],X[1,:], color='coral', markersize=marker_size, alpha=0.8,label='Truth')
-    ax1.plot(X_hat[0,:],X_hat[1,:],color='blue', linewidth=line_width, alpha=0.6,label='Estimated')
-    ax1.plot(X_meas[0,:],X_meas[1,:],color='green', linewidth=line_width, alpha=0.4,label='Measured')
-    ax1.plot(X[0,0],X[1,0],'kx')
-    ax1.set_xlabel("$x-position$", fontsize=ax_label_font)
-    ax1.set_ylabel("$y-position$", fontsize=ax_label_font)
-    plt.title("In-Plane Trajectory", fontsize=ax_label_font)
+    ax1.plot(t, X[0,:], color='red', linewidth=line_width, alpha=0.8,label='Truth')
+    ax1.plot(t, X_hat[0,:],color='blue', linewidth=line_width, alpha=0.8,label='Estimated')
+    ax1.plot(t, X_hat[0,:]+np.sqrt(P[0,0,:]),'--', color='black',alpha=0.4, label='1-$\sigma$  bounds')
+    ax1.plot(t, X_hat[0,:]-np.sqrt(P[0,0,:]),'--', color='black',alpha=0.4)
+    #ax1.plot(t, X_meas[0,:],'.',color='green', linewidth=line_width, alpha=0.8,label='Measured')
+    #ax1.set_ylim(min(X_hat[0,:]), max(X_hat[0,:]))
+    ax1.set_xlabel("$Time (s)$", fontsize=ax_label_font)
+    ax1.set_ylabel("$X-Position (m)$", fontsize=ax_label_font)
+    plt.title("X-Position vs. Time", fontsize=ax_label_font)
     ax1.legend()
 
     ax2 = fig.add_subplot(132)
     ax2.grid()
-    ax2.plot(t,state_error[0,:],color='blue',markersize=marker_size, alpha=0.8,label='$x-error$')
-    ax2.plot(t,state_error[1,:],color='red',markersize=marker_size, alpha=0.8,label='$y-error$')
-    #ax2.set_ylim(-1,1)
-    ax2.set_xlabel("$time$", fontsize=ax_label_font)
-    ax2.set_ylabel("$state-error$", fontsize=ax_label_font)
+    ax2.plot(t, X[1,:], color='red', linewidth=line_width, alpha=0.8,label='Truth')
+    ax2.plot(t, X_hat[1,:],color='blue', linewidth=line_width, alpha=0.8,label='Estimated')
+    ax2.plot(t, X_hat[1,:]+np.sqrt(P[1,1,:]),'--', color='black',alpha=0.4, label='1-$\sigma$ bounds')
+    ax2.plot(t, X_hat[1,:]-np.sqrt(P[1,1,:]),'--', color='black',alpha=0.4)
+    #ax2.plot(t, X_meas[1,:],'.',color='green', linewidth=line_width, alpha=0.8,label='Measured')
+    #ax2.set_ylim(min(X_hat[1,:]),max(X_hat[1,:]))
+    ax2.set_xlabel("$Time (s)$", fontsize=ax_label_font)
+    ax2.set_ylabel("$Y-Position (m)$", fontsize=ax_label_font)
+    plt.title("Y-Position vs. Time", fontsize=ax_label_font)
     ax2.legend()
-        
-    plt.title("State-Error vs. Time", fontsize=ax_label_font)
 
 
     ax3 = fig.add_subplot(133)
-    ax3.plot(t, U[0,:], '.', color='red', markersize=marker_size, alpha=0.8)
-    ax3.plot(t, U[1,:], '.', color='blue', markersize=marker_size, alpha=0.8)
-    ax3.plot(t, U[0,:], color='red', linewidth=line_width, alpha=0.2)
-    ax3.plot(t, U[1,:], color='blue', linewidth=line_width, alpha=0.2)
+    ax3.plot(t, state_error[0,:], color='blue', markersize=marker_size, alpha=0.8,label='x-error')
+    ax3.plot(t, state_error[1,:], color='red', markersize=marker_size, alpha=0.8, label='y-error')
     ax3.grid()
-    ax3.set_xlabel("time", fontsize=ax_label_font)
-    ax3.set_ylabel("thrust force", fontsize=ax_label_font)
-    plt.title("Thrust vs. Time", fontsize=ax_label_font)
+    ax3.set_xlabel("Time", fontsize=ax_label_font)
+    ax3.set_ylabel("State Error", fontsize=ax_label_font)
+    #ax3.set_ylim(min(state_error[0,1:]), max(state_error[1,1:]))
+    plt.title("State Error vs. Time", fontsize=ax_label_font)
+    ax3.legend()
 
 
+    # Save and Show 
+    if f_save_plot: 
+        plt.savefig('estimation_plot')
+        plt.show()
+
+elif f_plot_option == 4 :
+
+    # Style plot 
+    marker_size = 1.5
+    line_width = 1.25
+    fig = plt.figure(figsize=(20,5))
+    axis_font = 9
+    ax_label_font = 11
+    font = {'family' : 'normal',
+            'weight' : 'bold',
+            'size'   : axis_font}
+    mpl.rc('font', **font)
+    an = np.linspace(0, 2*np.pi, 100) # Parametrize angles for plotting circle
+
+    # Plot results 
+    ax1 = fig.add_subplot(121)
+    ax1.grid()
+    ax1.plot(X[0,:], X[1,:], color='red', linewidth=line_width, alpha=0.8,label='Truth')
+    ax1.plot(X_hat[0,:], X_hat[1,:], color='blue', linewidth=line_width, alpha=0.8,label='Estimated')
+    ax1.plot(X_hat[0,:]+np.sqrt(P[0,0,:]), X_hat[1,:]+np.sqrt(P[1,1,:]),'--',color='k', linewidth=line_width, alpha=0.8,label='1-$\sigma bounds')
+    ax1.plot(X_hat[0,:]-np.sqrt(P[0,0,:]), X_hat[1,:]-np.sqrt(P[1,1,:]),'--',color='k', linewidth=line_width, alpha=0.8)
+    #ax1.set_aspect('equal', 'box')
+    ax1.plot(delta_min*np.cos(an), delta_min*np.sin(an),linewidth=line_width, color='coral')
+    ax1.plot(delta_max*np.cos(an), delta_max*np.sin(an),linewidth=line_width, color='coral')
+
+    ax2 = fig.add_subplot(122)
+    ax2.grid()
+    ax2.plot(t[1:], violation_probability,'--',color='black', linewidth=line_width)
+    ax2.set_ylabel('Probability In Safe Zone')
+    ax2.set_xlabel('Time (s)')
 # Save and Show 
-if f_save_plot: 
-    plt.savefig('trajectory_plot')
-    plt.show()
+    if f_save_plot: 
+        plt.savefig('estimation_plot')
+        plt.show()
+
 
 # End 
 print("complete")
