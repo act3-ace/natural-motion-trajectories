@@ -25,18 +25,10 @@ class Controller(SystemParameters):
         mass_chaser = self.mass_chaser
     
         # Define in-plane CWH Dynamics 
-        A = np.array([[0, 0, 0, 1, 0, 0],
-                  [0, 0, 0, 0, 1, 0],
-                  [0, 0, 0, 0, 0, 1],
-                  [3*mean_motion**2, 0, 0, 0, 2*mean_motion, 0],
-                  [0, 0, 0, -2*mean_motion, 0, 0],
-                  [0, 0, -mean_motion**2, 0, 0, 0]])
-        B = np.array([[0, 0, 0],
-                  [0, 0, 0],
-                  [0, 0, 0],
-                  [1/mass_chaser, 0, 0],
-                  [0, 1/mass_chaser, 0],
-                  [0, 0, 1/mass_chaser]])
+        A = np.array([[0, 1.5*mean_motion],
+                      [0, 0]])
+        B = np.array([[1, 0],
+                      [0, 1]])
         
         # Specify LQR gains 
         Q = np.multiply(.010,np.eye(6))   # State cost 

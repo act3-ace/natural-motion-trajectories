@@ -47,14 +47,21 @@ class Controller(SystemParameters):
         
         # Options 
         self.f_goal_set = 2 # 0 for origin, 1 for periodic line, 2 for ellipses
+        self.f_collision_avoidance = True # activates or deactivates collision avoidance requirement
         
-        self.total_plan_time = 3000 # time to goal [s] 
-        self.tau0 = 300 # number steps in initial planning horizon 
-        
+        self.total_plan_time = 1000 # time to goal [s] 
+        self.tau0 = 50 # number steps in initial planning horizon 
+        self.collision_dist = 500 # minimum allowable distance from target [m]
+        self.kappa_speed = 2.1*self.mean_motion # NOTE: must be greater than 2*mean_motion
+        self.semiminor_out = 5/self.mean_motion # semi-minor axis of outer ellipse bound - motivated by velocity constraint 
+        self.semiminor_in = np.sqrt(5/4)*self.collision_dist # semi-minor axis of inner ellipse bound - motivated by collision avoidance constraint 
+
         
         # Set up (don't modify )
         self.zero_input = np.zeros([3,1])
         self.trajectory_initialized = False 
+        if self.f_goal_set == 0:
+            self.f_collision_avoidance = False
         
         self.t = np.linspace(0,self.total_plan_time, self.tau0) # time vector 
         self.dt_plan = self.t[1]-self.t[0] # time resolution of solver 
@@ -66,6 +73,8 @@ class Controller(SystemParameters):
             print("\nDriving chaser to target! \n")
         elif self.f_goal_set == 1: 
             print("\nDriving chaser to stationary trajectory! \n")
+        elif self.f_goal_set == 2: 
+            print("\nDriving chaser to elliptical NMT! \n")
 
         
         
@@ -97,6 +106,11 @@ class Controller(SystemParameters):
 
         """
         
+        # Options 
+        Nin = 6 # number of sides in inner-ellipse polygon approx 
+        Nout = 15 # number of sides in outer-ellipse polygon approx 
+        
+        
         initial_state = x0.reshape(6)
         goal_state = np.zeros(6)
         n  = self.mean_motion
@@ -122,6 +136,13 @@ class Controller(SystemParameters):
         Fx = [] 
         Fy = [] 
         Fz = [] 
+        snorm = [] 
+        sxabs = [] 
+        syabs = [] 
+        vnorm = [] 
+        vxabs = [] 
+        vyabs = [] 
+        zeta = [] 
         
         m = gp.Model("QPTraj")
         
@@ -136,11 +157,19 @@ class Controller(SystemParameters):
             sz.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -smax, ub = smax, name="sz"+str(t) )) 
             vz.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -vmax, ub = vmax, name="vz"+str(t) )) 
             Fz.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -Fmax, ub = Fmax, name="Fz"+str(t) ))
-            
+            snorm.append( m.addVar(vtype=GRB.CONTINUOUS, lb = 0, ub = smax, name="snorm"+str(t) )) 
+            sxabs.append( m.addVar(vtype=GRB.CONTINUOUS, lb = 0, ub = smax, name="sxabs"+str(t) )) 
+            syabs.append( m.addVar(vtype=GRB.CONTINUOUS, lb = 0, ub = smax, name="syabs"+str(t) )) 
+            vnorm.append( m.addVar(vtype=GRB.CONTINUOUS, lb = 0, ub = vmax, name="vnorm"+str(t) )) 
+            vxabs.append( m.addVar(vtype=GRB.CONTINUOUS, lb = 0, ub = vmax, name="vxabs"+str(t) )) 
+            vyabs.append( m.addVar(vtype=GRB.CONTINUOUS, lb = 0, ub = vmax, name="vyabs"+str(t) )) 
+        
+        for p in range(Nin): 
+            zeta.append( m.addVar(vtype=GRB.BINARY, name="zeta"+str(p)) )
             
         m.update()
                 
-        # Set boundary conditions 
+        # Set Initial Conditions 
         m.addConstr( sx[0] == initial_state[0] , "sx0")
         m.addConstr( sy[0] == initial_state[1] , "sy0")
         m.addConstr( sz[0] == initial_state[2] , "sz0")
@@ -148,6 +177,8 @@ class Controller(SystemParameters):
         m.addConstr( vy[0] == initial_state[4] , "vy0")
         m.addConstr( vz[0] == initial_state[5] , "vz0")
         
+        
+        # Specify Terminal Set 
         if self.f_goal_set == 0: # origin 
             m.addConstr( sx[-1] == goal_state[0] , "sxf")
             m.addConstr( sy[-1] == goal_state[1] , "syf")
@@ -162,14 +193,67 @@ class Controller(SystemParameters):
         elif self.f_goal_set == 2: # ellipse 
             m.addConstr( vy[-1] + 2*n*sx[-1] == 0, "ellipse1" )
             m.addConstr( sy[-1] - (2/n)*vx[-1] == 0, "ellipse2" )
-            # m.addConstr( vy[-1] + + 2*n*sx[-1] + sy[-1] - (2/n)*vx[-1] == 0   )
-            
-            # m.addConstr( sx[-1] - sz[-1] == 0 )
-            # m.addConstr( sz[-1] - vx[-1] == 0 )
-            # m.addConstr( vx[-1] - vz[-1] == 0 )
-            
             
         
+        # Set dynamic speed limit 
+        for t in range(tau):
+            # Define the norms: 
+            m.addConstr( sxabs[t] == gp.abs_(sx[t]) )
+            m.addConstr( syabs[t] == gp.abs_(sy[t]) )
+            m.addConstr( snorm[t] == gp.max_(sxabs[t], syabs[t]), "snorm"+str(t) )
+            m.addConstr( vxabs[t] == gp.abs_(vx[t]) )
+            m.addConstr( vyabs[t] == gp.abs_(vy[t]) )
+            m.addConstr( vnorm[t] == gp.max_(vxabs[t], vyabs[t]), "vnorm"+str(t) )
+            
+            # Speed limit constraint: 
+            m.addConstr( vnorm[t] <= self.kappa_speed*snorm[t] )
+            
+        
+        # Collision Avoidance Constraint
+        if self.f_collision_avoidance: 
+            for t in range(tau): 
+                m.addConstr( snorm[t] >= self.collision_dist)
+            if initial_state[0]<self.collision_dist or initial_state[1]<self.collision_dist: 
+                print("\nERROR: Initial position is too close! Collision constraint violated!\n")
+        
+        # # Final point within [1km-5km] of target 
+        # m.addConstr( snorm[-1] <= 2000 )
+        # m.addConstr( snorm[-1] >= 1000 )
+            
+            
+        # Terminal constraint: inner polygonal approx on outer ellipse bound 
+        Nout = Nout+1 
+        aout = self.semiminor_out
+        bout = self.semiminor_out*2 
+        theta = np.linspace(0, 2*np.pi, Nout)
+        for j in range(0,Nout-1): 
+            x0 = aout*np.cos(theta[j])
+            y0 = bout*np.sin(theta[j])
+            x1 = aout*np.cos(theta[j+1])
+            y1 = bout*np.sin(theta[j+1])
+            alphax = y0-y1 
+            alphay = x1-x0
+            gamma  = alphay*y1 + alphax*x1
+            m.addConstr( alphax*sx[-1] + alphay*sy[-1] >= gamma , "OPA"+str(j) )
+                
+        # Terminal constraint: outer polygonal approx on inner ellipse bound 
+        if self.f_collision_avoidance : 
+            a_in = self.semiminor_in
+            b_in = self.semiminor_in*2 
+            theta = np.linspace(0, 2*np.pi, Nin+1)  
+            big_M = 100000
+            for j in range(0,Nin): 
+                x0 = a_in*np.cos(theta[j])
+                y0 = b_in*np.sin(theta[j])
+                c1 = (2*x0/(a_in**2))
+                c2 = (2*y0/(b_in**2)) 
+                cmag = np.sqrt(c1**2 + c2**2)
+                c1 = c1/cmag
+                c2 = c2/cmag
+                m.addConstr( c1*sx[-1] + c2*sy[-1] - c1*x0 - c2*y0 - big_M*zeta[j]  >= - big_M, "IPA"+str(j) ) 
+            m.addConstr( sum( zeta[p] for p in range(Nin) ) >= 0.5 )
+
+            
         # Set Dynamics 
         for t in range(tau-1) :
             # Dynamics 
@@ -186,7 +270,6 @@ class Controller(SystemParameters):
             obj = obj + Fx[t]*Fx[t] + Fy[t]*Fy[t] + Fz[t]*Fz[t]
         
         
-        
         m.setObjective(obj, GRB.MINIMIZE)
         m.setParam( 'OutputFlag', False )
         
@@ -195,16 +278,18 @@ class Controller(SystemParameters):
         
         
         # Save desired trajectory 
-        # self.xstar = np.zeros([6, tau]) 
+        self.xstar = np.zeros([6, tau]) 
         self.ustar = np.zeros([3, tau])
+        self.snorm = np.zeros([tau])
+        self.vnorm = np.zeros([tau])
         
         for t in range(tau): # TODO: find quicker way to do this 
-            # self.xstar[0,t] = m.getVarByName("sx"+str(t)).x
-            # self.xstar[1,t] = m.getVarByName("sy"+str(t)).x
-            # self.xstar[3,t] = m.getVarByName("vx"+str(t)).x
-            # self.xstar[4,t] = m.getVarByName("vy"+str(t)).x
+            self.xstar[0,t] = m.getVarByName("sx"+str(t)).x
+            self.xstar[1,t] = m.getVarByName("sy"+str(t)).x
+            self.xstar[3,t] = m.getVarByName("vx"+str(t)).x
+            self.xstar[4,t] = m.getVarByName("vy"+str(t)).x
             self.ustar[0,t] = m.getVarByName("Fx"+str(t)).x
             self.ustar[1,t] = m.getVarByName("Fy"+str(t)).x
             self.ustar[2,t] = m.getVarByName("Fz"+str(t)).x
-        
-        
+            self.snorm[t]   = m.getVarByName("snorm"+str(t)).x 
+            self.vnorm[t]   = m.getVarByName("vnorm"+str(t)).x         
