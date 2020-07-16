@@ -1,6 +1,7 @@
 import numpy as np 
 import math 
 import scipy.linalg
+from scipy.stats import norm
 
 
 def get_lqr_gain(A,B,Q,R):
@@ -34,3 +35,12 @@ def wrap_to_pi(theta) :
     elif  theta < -math.pi :
         theta = theta + 2*math.pi 
     return theta 
+
+def probViolation(state, uc, inner_ring, outer_ring):
+    """
+    Calculates the probability the state violates the safety distances given my inner ring and outer ring.
+    """
+    dist = scipy.linalg.norm(state)
+    range_uc = uc[1,1]+uc[2,2]
+    return scipy.stats.norm(dist, range_uc).cdf(outer_ring) - scipy.stats.norm(dist, range_uc).cdf(inner_ring)
+
