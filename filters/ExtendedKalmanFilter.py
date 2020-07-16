@@ -39,7 +39,8 @@ class dynamicFilter(SystemParameters, ClohessyWiltshire):
 
         def update(self, x_pred, P_pred, meas_state):
             # Preliminary Info
-            v = meas_state-x_pred # Difference in predicted and measured state
+            v = meas_state-MeasurementModel.h(x_pred) # Difference actual measured state and predicted measured state
+            print(v)
             # S = HPH'+R
             S = np.matmul(np.matmul(self.H,P_pred),self.H.transpose())+np.matmul(np.matmul(self.H,self.R),self.H.transpose())
             # K = PH'S^(-1)
@@ -58,13 +59,20 @@ class dynamicFilter(SystemParameters, ClohessyWiltshire):
         # Define Measurement Parameters
         self.R = MeasurementModel.R
         self.Q = MeasurementModel.Q
-        self.H = MeasurementModel.BuildMeasureJacob(meas_state)
+        
         
         # Prediction Step
         x_pred, P_pred = predict(self, est_state, P, u, dt)
 
-        # Update Step
-        x_hat, P = update(self, x_pred, P_pred, meas_state)
+        if isinstance(meas_state, str):
+            x_hat = x_pred
+            P = P_pred
+        else:
+            self.H = MeasurementModel.BuildMeasureJacob(est_state)
+            # Update Step
+            x_hat, P = update(self, x_pred, P_pred, meas_state)
+            
+
 
         return x_hat, P
 

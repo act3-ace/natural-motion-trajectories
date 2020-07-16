@@ -10,27 +10,37 @@ import random
 
 class MeasurementModel():
  
-    Q = np.zeros(6) # Process Noise
+    Q = np.zeros([6,6]) # Process Noise
         
     std_dev = 0.0001
     R = np.identity(6)*std_dev
+
+    H = np.identity(6)
 
     @classmethod
     def MeasureFcn(cls, state_real):
         return np.random.multivariate_normal(state_real, cls.R)
 
     @classmethod
-    def BuildMeasureJacob(cls,state_real):
-        rho = np.linalg.norm(state_real[1:3])
+    def h(cls, state_real):
 
-        cls.H[1,1] = state_real[1]/rho
-        cls.H[1,2] = state_real[2]/rho
-        cls.H[1,3] = 0
-        cls.H[2,1] =  -state_real[2]/rho
-        cls.H[2,2] = state_real[1]/rho
-        cls.H[2,3] = 0
-        cls.H[3,1] = 0
-        cls.H[3,2] = 0
-        cls.H[3,3] = 1/rho
+        vec_size = np.shape(state_real)
+
+        if vec_size[0] == 6:
+            state_real = np.reshape(state_real, [6,1])
+        
+        s = np.zeros([6,1])
+        rho = np.linalg.norm(state_real[0:3])
+        s[0:3] = state_real[0:3]/rho
+        s[3:6] = state_real[3:6]
+        
+        return s
+
+    @classmethod
+    def BuildMeasureJacob(cls,state_real):
+        rho = np.linalg.norm(state_real[0:3])
+        s = state_real[0:3]/rho
+
+        cls.H[0:3,0:3] = 1/rho*(np.identity(3)-s*np.transpose(s))
 
         return cls.H # Measurement Model Jacobian

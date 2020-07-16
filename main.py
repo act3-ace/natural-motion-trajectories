@@ -27,11 +27,11 @@ from utilities.misc import probViolation
 # Import the Desired Controller from the "controllers" directory 
 from controllers.template_controller import Controller
 # Import the Desired Measurement Model 
-from MeasurementModels.simple import MeasurementModel
+from MeasurementModels.simpleARPOD import MeasurementModel
 # Import the Desired Filter from the "filters" directory 
 from filters.ExtendedKalmanFilter import dynamicFilter
 # Import Active Set Invariance Filter (ASIF) (aka RTA mechanism)
-from asif.CBF_for_speed_limit import ASIF
+#from asif.CBF_for_speed_limit import ASIF
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
 
@@ -43,10 +43,10 @@ from asif.CBF_for_speed_limit import ASIF
 f_plot_option = 4 # choose 0, 1, 2, or 3 
 f_save_plot = True # saves a plot at end of simulation 
 f_use_RTA_filter = False # filters the controllers input to ensure safety 
-adaptiveMeasurement = True # True or False; False sets to default measurement frequency
+adaptiveMeasurement = False # True or False; False sets to default measurement frequency
 
 # Parameters 
-T  = 5000 # total simulation time [s]
+T  = 500 # total simulation time [s]
 Nsteps = T # number steps in simulation time horizon 
 
 dim_state = 6; 
@@ -100,10 +100,10 @@ X_hat[:,0] = x_hat.reshape(dim_state)
 state_error[:,0] = X_hat[:,0]-X[:,0] # state error at initial time step
 P[:,:,0] = P0 # Covariance at initial time step
 controller = Controller() # Initialize Controller class 
-asif = ASIF() # Initialize ASIF class 
+#asif = ASIF() # Initialize ASIF class 
 filterScheme = dynamicFilter() # Initialize filter class
 takeMeasurement = MeasurementModel() # Define Measurement Model
-X_meas[:,0] = takeMeasurement.MeasureFcn(X[:,0])
+X_meas[:,0] = takeMeasurement.h(X[:,0]).reshape(1,dim_state)
 violation_probability = np.zeros([Nsteps-1])
 
 steps_per_sample = np.max([1, np.round(T_sample/dt)])
@@ -147,25 +147,24 @@ for i in range(1,Nsteps):
 
     # Compute Violation Probability====================================================
     # Only measure if uncertainty is high enough
-    # Still need to translate to python
     violation_probability[i-1] = probViolation(X_hat[:,i-1], P[:,:,i-1], delta_min, delta_max)
-    #print(violation_probability[i-1])
     #==================================================================================
 
     # Compute Measurement
     if adaptiveMeasurement:
         if violation_probability[i-1] <= 0.95:
-            x_meas = MeasurementModel.MeasureFcn(X[:,i])
-            X_meas[:,i] = x_meas
-            x_meas = x_meas.reshape(dim_state,1)
+            #x_meas = MeasurementModel.MeasureFcn(X[:,i])
+            x_meas = MeasurementModel.h(X[:,i])
+            X_meas[:,i] = x_meas.reshape(1,dim_state)
+            x_meas = x_meas
             print("Measurement taken at index"+"{:f}".format(i-1))
         else:
             x_meas = 'NA'
     else:
         if (i-1)%steps_per_meas==0:
-            x_meas = MeasurementModel.MeasureFcn(X[:,i])
-            X_meas[:,i] = x_meas
-            x_meas = x_meas.reshape(dim_state,1)
+            x_meas = MeasurementModel.h(X[:,i])
+            X_meas[:,i] = x_meas.reshape(1,dim_state)
+            x_meas = x_meas
             print("Measurement taken at index"+"{:f}".format(i-1))          
         else:
             x_meas = 'NA'        
