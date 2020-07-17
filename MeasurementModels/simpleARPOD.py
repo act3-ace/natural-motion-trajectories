@@ -26,10 +26,14 @@ class MeasurementModel():
 
         vec_size = np.shape(state_real)
 
+        # Ensure column vector
         if vec_size[0] == 6:
             state_real = np.reshape(state_real, [6,1])
         
+        # Initialize measurement vector
         s = np.zeros([6,1])
+        
+        #s = [r/||r||; v]
         rho = np.linalg.norm(state_real[0:3])
         s[0:3] = state_real[0:3]/rho
         s[3:6] = state_real[3:6]
