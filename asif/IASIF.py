@@ -84,61 +84,42 @@ class ASIF(SystemParameters):
             returned control input  
         """
         
-        ################### Set up optimization program ######################
-        Fx_des = u_des[0,0]
-        Fy_des = u_des[1,0]
-        
-         # Initialize states 
-        Fx = [] 
-        Fy = [] 
-        dist_out_of_bounds1 = [] 
-        dist_out_of_bounds2 = [] 
-        
-        m = gp.Model("IASIF")
-        
-        # Define variables at each of the tau timesteps  
-        Fx.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -self.max_available_thrust, ub = self.max_available_thrust, name="Fx" )) 
-        Fy.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -self.max_available_thrust, ub = self.max_available_thrust, name="Fy" )) 
-        dist_out_of_bounds1.append( m.addVar(vtype=GRB.CONTINUOUS, lb = 0, ub = 1000*self.max_available_thrust, name="DOB1" )) 
-        dist_out_of_bounds2.append( m.addVar(vtype=GRB.CONTINUOUS, lb = 0, ub = 1000*self.max_available_thrust, name="DOB2" )) 
-            
-        m.update()
-        
-        ######################################################################
-        
         # Cut out "z" dimension in x0 
         x0 = np.array([x0[0], x0[1], x0[3], x0[4]])
         
-        # Integrate finite time trajectory under backup control law to initialize "self.phi" array
-        self.integrate(x0)
-        
-        Ax0 = np.matmul(self.A, x0.reshape(4,1))
-
-        ################ Backwards reachability constraint ################### 
-        # Define coefficients 
-        ghb = self.grad_hb(self.phi[:,-1])
-        d = np.matmul(ghb, np.matmul(self.Dphi[:,:,-1], Ax0)) + self.alpha( self.h_b( self.phi[:,-1] ) )
-        c = np.matmul(ghb, np.matmul(self.Dphi[:,:,-1], self.B ))
-        
-        # Round to prevent Gurobi warnings 
-        if np.abs(c[0])<1e-13: 
-            c[0]=1e-13*np.sign(c[0])
-        if np.abs(c[1])<1e-13: 
-            c[1]=1e-13*np.sign(c[0])
-        if np.abs(d[0])<1e-13: 
-            d[0]=1e-13*np.sign(c[0])
-        
-        # Add constraint 
-        m.addConstr( c[0]*Fx[0] + c[1]*Fy[0] + dist_out_of_bounds1[0] >= -d[0]  , "BRC")
-        
-        
-        ################### Set invariance constraints ####################### 
-        for i in range(0,self.Nsteps):
-            # print(i)
+        try: 
+            ################### Set up optimization program ######################
+            Fx_des = u_des[0,0]
+            Fy_des = u_des[1,0]
+            
+             # Initialize states 
+            Fx = [] 
+            Fy = [] 
+            dist_out_of_bounds1 = [] 
+            dist_out_of_bounds2 = [] 
+            
+            m = gp.Model("IASIF")
+            
+            # Define variables at each of the tau timesteps  
+            Fx.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -self.max_available_thrust, ub = self.max_available_thrust, name="Fx" )) 
+            Fy.append( m.addVar(vtype=GRB.CONTINUOUS, lb = -self.max_available_thrust, ub = self.max_available_thrust, name="Fy" )) 
+            dist_out_of_bounds1.append( m.addVar(vtype=GRB.CONTINUOUS, lb = 0, ub = 1000*self.max_available_thrust, name="DOB1" )) 
+            dist_out_of_bounds2.append( m.addVar(vtype=GRB.CONTINUOUS, lb = 0, ub = 1000*self.max_available_thrust, name="DOB2" )) 
+                
+            m.update()
+            
+            ######################################################################
+            
+            # Integrate finite time trajectory under backup control law to initialize "self.phi" array
+            self.integrate(x0)
+            
+            Ax0 = np.matmul(self.A, x0.reshape(4,1))
+    
+            ################ Backwards reachability constraint ################### 
             # Define coefficients 
-            ghs = self.grad_hs(self.phi[:,i])
-            d = np.matmul(ghs, np.matmul(self.Dphi[:,:,i], Ax0)) + self.alpha( self.h_s( self.phi[:,i] ) )
-            c = np.matmul(ghs, np.matmul(self.Dphi[:,:,i], self.B ))
+            ghb = self.grad_hb(self.phi[:,-1])
+            d = np.matmul(ghb, np.matmul(self.Dphi[:,:,-1], Ax0)) + self.alpha( self.h_b( self.phi[:,-1] ) )
+            c = np.matmul(ghb, np.matmul(self.Dphi[:,:,-1], self.B ))
             
             # Round to prevent Gurobi warnings 
             if np.abs(c[0])<1e-13: 
@@ -147,30 +128,54 @@ class ASIF(SystemParameters):
                 c[1]=1e-13*np.sign(c[0])
             if np.abs(d[0])<1e-13: 
                 d[0]=1e-13*np.sign(c[0])
-                
+            
             # Add constraint 
-            m.addConstr( c[0]*Fx[0] + c[1]*Fy[0] + dist_out_of_bounds2[0] >= -d[0]  , "BC"+str(i))
-            # m.addConstr( c[0]*Fx[0] + c[1]*Fy[0]  >= -d[0]  , "BC"+str(i))
-
-        
-        
-        
-        ################### Solve optimization program! ######################
-        # Set Objective
-        obj = Fx[0]*Fx[0] + Fy[0]*Fy[0] - 2*Fx_des*Fx[0] - 2*Fy_des*Fy[0] + 10000*dist_out_of_bounds1[0]+10000*dist_out_of_bounds2[0]
-
-        m.setObjective(obj, GRB.MINIMIZE)
-        m.setParam( 'OutputFlag', False )
-        
-        # Optimize and report on results 
-        m.optimize()
-        
-        # Pull in results 
-        self.ustar = np.zeros([3, 1])
-        
-        self.ustar[0,0] = m.getVarByName("Fx").x
-        self.ustar[1,0] = m.getVarByName("Fy").x
-        self.ustar[2,0] = u_des[2,0] # force input in z direction equal to desired        
+            m.addConstr( c[0]*Fx[0] + c[1]*Fy[0] + dist_out_of_bounds1[0] >= -d[0]  , "BRC")
+            
+            
+            ################### Set invariance constraints ####################### 
+            for i in range(0,self.Nsteps):
+                # print(i)
+                # Define coefficients 
+                ghs = self.grad_hs(self.phi[:,i])
+                d = np.matmul(ghs, np.matmul(self.Dphi[:,:,i], Ax0)) + self.alpha( self.h_s( self.phi[:,i] ) )
+                c = np.matmul(ghs, np.matmul(self.Dphi[:,:,i], self.B ))
+                
+                # Round to prevent Gurobi warnings 
+                if np.abs(c[0])<1e-13: 
+                    c[0]=1e-13*np.sign(c[0])
+                if np.abs(c[1])<1e-13: 
+                    c[1]=1e-13*np.sign(c[0])
+                if np.abs(d[0])<1e-13: 
+                    d[0]=1e-13*np.sign(c[0])
+                    
+                # Add constraint 
+                m.addConstr( c[0]*Fx[0] + c[1]*Fy[0] + dist_out_of_bounds2[0] >= -d[0]  , "BC"+str(i))
+                # m.addConstr( c[0]*Fx[0] + c[1]*Fy[0]  >= -d[0]  , "BC"+str(i))
+    
+            
+            
+            
+            ################### Solve optimization program! ######################
+            # Set Objective
+            obj = Fx[0]*Fx[0] + Fy[0]*Fy[0] - 2*Fx_des*Fx[0] - 2*Fy_des*Fy[0] + 10000*dist_out_of_bounds1[0]+10000*dist_out_of_bounds2[0]
+    
+            m.setObjective(obj, GRB.MINIMIZE)
+            m.setParam( 'OutputFlag', False )
+            
+            # Optimize and report on results 
+            m.optimize()
+            
+            # Pull in results 
+            self.ustar = np.zeros([3, 1])
+            
+            self.ustar[0,0] = m.getVarByName("Fx").x
+            self.ustar[1,0] = m.getVarByName("Fy").x
+            self.ustar[2,0] = u_des[2,0] # force input in z direction equal to desired        
+        except: 
+            print("Optimization failed! You may be starting in an unsafe region... Reverting to backup controller")
+            ub = self.u_b(x0)
+            self.ustar = np.array([ [ub[0,0]], [ub[1,0]], [u_des[2,0]] ])
         
         return self.ustar 
     
@@ -193,14 +198,7 @@ class ASIF(SystemParameters):
         ghs[1] = ghs[1] + 2*self.K1_s*self.K2_s*rn1*x[1] 
         # print(ghs)
         return ghs 
-        # rn1 = 1/np.sqrt(x[0]**2 + x[1]**2) # 1/r 
 
-        # ghs = np.array([  2*(self.K1_s**2)*x[0]**2 + 2*self.K1_s*self.K2_s*rn1*x[0]   ,
-        #                   2*(self.K1_s**2)*x[1]**2 + 2*self.K1_s*self.K2_s*rn1*x[1]   , 
-        #                   -2*x[2] , 
-        #                   -2*x[3]  ])
-        # return ghs
-    
     ##########################################################################  
     def h_b(self, x):
         """
