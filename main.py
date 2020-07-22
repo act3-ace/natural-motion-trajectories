@@ -31,7 +31,7 @@ from MeasurementModels.simpleARPOD import MeasurementModel
 # Import the Desired Filter from the "filters" directory 
 from filters.ExtendedKalmanFilter import dynamicFilter
 # Import Active Set Invariance Filter (ASIF) (aka RTA mechanism)
-#from asif.CBF_for_speed_limit import ASIF
+from asif.CBF_for_speed_limit import ASIF
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
 
@@ -46,11 +46,12 @@ f_use_RTA_filter = False # filters the controllers input to ensure safety
 adaptiveMeasurement = False # True or False; False sets to default measurement frequency
 
 # Parameters 
-T  = 500 # total simulation time [s]
+T  = 5000 # total simulation time [s]
 Nsteps = T # number steps in simulation time horizon 
 
 dim_state = 6; 
 dim_control = 3; 
+dim_meas = 3
 sys_data = SystemParameters() 
 mean_motion = sys_data.mean_motion
 mass_chaser = sys_data.mass_chaser # [kg]
@@ -79,7 +80,7 @@ x_hat = x0 + np.array([[rand.random()],
                     [0],
                     [0]])
 
-P0 = np.identity(6)
+P0 = np.identity(6)*0.1
 
 
 ##############################################################################
@@ -93,17 +94,17 @@ U = np.zeros([dim_control, Nsteps]) # control at each time
 X_hat = np.zeros([dim_state, Nsteps]) # state estimate at each time step
 state_error = np.zeros([dim_state, Nsteps]) # State error at each time step
 P = np.zeros([dim_state, dim_state, Nsteps]) # Covariance Matrix
-X_meas = np.zeros([dim_state, Nsteps])
+X_meas = np.zeros([dim_meas, Nsteps])
 dt = t[1]-t[0]
 X[:,0]=x0.reshape(dim_state)
 X_hat[:,0] = x_hat.reshape(dim_state)
 state_error[:,0] = X_hat[:,0]-X[:,0] # state error at initial time step
 P[:,:,0] = P0 # Covariance at initial time step
 controller = Controller() # Initialize Controller class 
-#asif = ASIF() # Initialize ASIF class 
+asif = ASIF() # Initialize ASIF class 
 filterScheme = dynamicFilter() # Initialize filter class
 takeMeasurement = MeasurementModel() # Define Measurement Model
-X_meas[:,0] = takeMeasurement.h(X[:,0]).reshape(1,dim_state)
+X_meas[:,0] = takeMeasurement.h(X[:,0]).reshape(1,dim_meas)
 violation_probability = np.zeros([Nsteps-1])
 
 steps_per_sample = np.max([1, np.round(T_sample/dt)])
@@ -155,17 +156,17 @@ for i in range(1,Nsteps):
         if violation_probability[i-1] <= 0.95:
             #x_meas = MeasurementModel.MeasureFcn(X[:,i])
             x_meas = MeasurementModel.h(X[:,i])
-            X_meas[:,i] = x_meas.reshape(1,dim_state)
+            X_meas[:,i] = x_meas.reshape(1,dim_meas)
             x_meas = x_meas
-            print("Measurement taken at index"+"{:f}".format(i-1))
+            #print("Measurement taken at index"+"{:f}".format(i-1))
         else:
             x_meas = 'NA'
     else:
         if (i-1)%steps_per_meas==0:
             x_meas = MeasurementModel.h(X[:,i])
-            X_meas[:,i] = x_meas.reshape(1,dim_state)
+            X_meas[:,i] = x_meas.reshape(1,dim_meas)
             x_meas = x_meas
-            print("Measurement taken at index"+"{:f}".format(i-1))          
+            #print("Measurement taken at index"+"{:f}".format(i-1))          
         else:
             x_meas = 'NA'        
 
