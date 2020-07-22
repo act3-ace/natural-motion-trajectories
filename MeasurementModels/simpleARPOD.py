@@ -12,10 +12,10 @@ class MeasurementModel():
  
     Q = np.zeros([6,6]) # Process Noise
         
-    std_dev = 0.0001
-    R = np.identity(6)*std_dev
+    std_dev = 0.01
+    R = np.identity(3)*std_dev
 
-    H = np.identity(6)
+    H = np.zeros([3,6])
 
     @classmethod
     def MeasureFcn(cls, state_real):
@@ -31,12 +31,12 @@ class MeasurementModel():
             state_real = np.reshape(state_real, [6,1])
         
         # Initialize measurement vector
-        s = np.zeros([6,1])
+        s = np.zeros([3,1])
         
         #s = [r/||r||; v]
         rho = np.linalg.norm(state_real[0:3])
         s[0:3] = state_real[0:3]/rho
-        s[3:6] = state_real[3:6]
+        #s[3:6] = state_real[3:6]
         
         return s
 
