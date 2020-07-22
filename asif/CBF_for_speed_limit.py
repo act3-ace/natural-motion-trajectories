@@ -20,11 +20,13 @@ class ASIF(SystemParameters):
         
         self.safety_constraint = 1 
         
-        safety_factor = 18000 # 200
+        # safety_factor = 18000 # 200
         self.Fmax = self.max_available_thrust 
-        mass = self.mass_chaser 
+        # mass = self.mass_chaser 
         
-        self.K = np.sqrt(self.Fmax/(2*mass))/safety_factor
+        self.K1_s = 2*self.mean_motion # np.sqrt(self.Fmax/(2*mass))/safety_factor
+        self.K2_s = 0.2 
+        self.K = self.K1_s
         
         # Define CWH Dynamics 
         self.A = np.array([[0, 0, 1, 0],
@@ -36,7 +38,12 @@ class ASIF(SystemParameters):
                   [1/self.mass_chaser, 0],
                   [0, 1/self.mass_chaser]])
         
-        
+        self.Hs = np.array( [[ 2*self.K1_s**2,           0,   0,    0],
+                              [           0, 2*self.K1_s**2,   0,    0], 
+                              [           0,           0,  -2,    0], 
+                              [           0,           0,   0,   -2] ] )
+    
+    ##########################################################################        
     def main(self, x0, u_des):
         """
         Parameters
@@ -64,6 +71,7 @@ class ASIF(SystemParameters):
         
         # Calculate Subregulation Map using: hdot = sigma + eta*u
         sigma = np.matmul(self.grad_hs(x), np.matmul(self.A,x))
+        
         eta = np.matmul(self.grad_hs(x), self.B)
         # print("eta = ", eta )
         etax = eta[0]
@@ -71,7 +79,7 @@ class ASIF(SystemParameters):
         
         # Barrier constraint hdot + alpha(h(x)) >= 0 
         # print("hs(x) = ", self.hs(x) )
-        alpha_hs = self.alpha(self.hs(x))
+        alpha_hs = self.alpha(self.h_s(x))
         
         # Initialize states 
         Fx = [] 
@@ -125,38 +133,30 @@ class ASIF(SystemParameters):
         # print("u_des = ", u_des)
         return self.ustar 
     
-    def hs(self, x):
+    ##########################################################################        
+    def h_s(self, x):
         """
-        hs(x) >= 0 defines the set of all "safe states". The goal of the ASIF 
-        is to ensure that this constraint remains satisfied for all time
+        h_s(x) >= 0 defines the set of all "safe states". The goal of the ASIF 
+        is to ensure that this constraint remains satisfied 
         
         """
-        sx = x[0,0] # x-position 
-        sy = x[1,0] # y-position
-        vx = x[2,0] # x-velocity
-        vy = x[3,0] # y-velocity 
-        val = self.K*(sx**2 + sy**2) - vx**2 - vy**2 
-        
-        return val 
-    
-    def grad_hs(self, x): 
-        """
-        gradient of hs(x)
-        
-        """
+        x = x.flatten()
+        r2 = x[0]**2 + x[1]**2
+        return self.K2_s**2 + (self.K1_s**2)*(r2) + self.K1_s*self.K2_s*np.sqrt(r2) - (x[2]**2 + x[3]**2) 
 
-        sx = x[0,0] # x-position 
-        sy = x[1,0] # y-position
-        vx = x[2,0] # x-velocity
-        vy = x[3,0] # y-velocity 
+    ##########################################################################        
+    def grad_hs(self, x):
+        x = x.flatten() 
+        ghs = np.matmul( self.Hs, x )
+        rn1 = 1/np.sqrt(x[0]**2 + x[1]**2) # 1/r 
+        ghs[0] = ghs[0] + 2*self.K1_s*self.K2_s*rn1*x[0] 
+        ghs[1] = ghs[1] + 2*self.K1_s*self.K2_s*rn1*x[1] 
+        # print(ghs)
+        return ghs 
         
-        nabla_hs = np.array([ 2*self.K*sx, 2*self.K*sy, -2*vx, -2*vy ])
-        
-        return nabla_hs
-        
-    
+    ##########################################################################        
     def alpha(self, x):
         # print("x = ", x)
-        return  .0002*x**3
+        return  10*x**3
         
         
