@@ -16,7 +16,7 @@ class SystemParameters:
     controller_sample_rate = .2 # [Hz] 
     controller_sample_period = 1/controller_sample_rate # [s]
 
-    filter_sample_rate = 1/100 # [Hz]
+    filter_sample_rate = 1 # [Hz]
     filter_sample_period = 1/filter_sample_rate # [s]
     
     
