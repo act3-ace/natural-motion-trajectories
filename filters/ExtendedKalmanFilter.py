@@ -40,9 +40,9 @@ class dynamicFilter(SystemParameters, ClohessyWiltshire):
         def update(self, x_pred, P_pred, meas_state):
             # Preliminary Info
             v = meas_state-MeasurementModel.h(x_pred) # Difference actual measured state and predicted measured state
-            print(v)
+            
             # S = HPH'+R
-            S = np.matmul(np.matmul(self.H,P_pred),self.H.transpose())+np.matmul(np.matmul(self.H,self.R),self.H.transpose())
+            S = np.matmul(np.matmul(self.H,P_pred),self.H.transpose())+self.R
             # K = PH'S^(-1)
             K = np.matmul(np.matmul(P_pred, self.H.transpose()),linalg.inv(S)) # Kalman Gain
 
@@ -51,8 +51,10 @@ class dynamicFilter(SystemParameters, ClohessyWiltshire):
 
             # Update Covariance Matrix
             # P = (I-KH)P(I-KH)'+KRK'
-            I_KH = np.identity(6) - np.matmul(K,self.H)
-            P = np.matmul(np.matmul(I_KH, P_pred),I_KH.transpose())+np.matmul(np.matmul(K,self.R),K.transpose())
+            #I_KH = np.identity(6) - np.matmul(K,self.H)
+            #P = np.matmul(np.matmul(I_KH, P_pred),I_KH.transpose())+np.matmul(np.matmul(K,self.R),K.transpose())
+            
+            P = P_pred - np.matmul(K,np.matmul(S,np.transpose(K)))
         
             return x_hat, P
         
