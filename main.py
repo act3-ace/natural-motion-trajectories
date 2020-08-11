@@ -31,7 +31,7 @@ from MeasurementModels.angles_only import MeasurementModel
 # Import the Desired Filter from the "filters" directory 
 from filters.ExtendedKalmanFilter import dynamicFilter
 # Import Active Set Invariance Filter (ASIF) (aka RTA mechanism)
-# from asif.CBF_for_speed_limit import ASIF
+from asif.CBF_for_speed_limit import ASIF
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
 
@@ -101,7 +101,7 @@ X_hat[:,0] = x_hat.reshape(dim_state)
 state_error[:,0] = X_hat[:,0]-X[:,0] # state error at initial time step
 P[:,:,0] = P0 # Covariance at initial time step
 controller = Controller() # Initialize Controller class 
-#asif = ASIF() # Initialize ASIF class 
+asif = ASIF() # Initialize ASIF class 
 filterScheme = dynamicFilter() # Initialize filter class
 takeMeasurement = MeasurementModel() # Define Measurement Model
 X_meas[:,0] = takeMeasurement.h(X[:,0]).reshape(1,dim_meas)
