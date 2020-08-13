@@ -27,7 +27,7 @@ from utilities.misc import probViolation
 # Import the Desired Controller from the "controllers" directory 
 from controllers.template_controller import Controller
 # Import the Desired Measurement Model 
-from MeasurementModels.simpleARPOD import MeasurementModel
+from MeasurementModels.angles_only import MeasurementModel
 # Import the Desired Filter from the "filters" directory 
 from filters.ExtendedKalmanFilter import dynamicFilter
 # Import Active Set Invariance Filter (ASIF) (aka RTA mechanism)
@@ -51,7 +51,7 @@ Nsteps = T # number steps in simulation time horizon
 
 dim_state = 6; 
 dim_control = 3; 
-dim_meas = 3
+dim_meas = MeasurementModel.dimension
 sys_data = SystemParameters() 
 mean_motion = sys_data.mean_motion
 mass_chaser = sys_data.mass_chaser # [kg]
@@ -395,17 +395,26 @@ elif f_plot_option == 4 :
     ax1.grid()
     ax1.plot(X[0,:], X[1,:], color='red', linewidth=line_width, alpha=0.8,label='Truth')
     ax1.plot(X_hat[0,:], X_hat[1,:], color='blue', linewidth=line_width, alpha=0.8,label='Estimated')
-    ax1.plot(X_hat[0,:]+np.sqrt(P[0,0,:]), X_hat[1,:]+np.sqrt(P[1,1,:]),'--',color='k', linewidth=line_width, alpha=0.8,label='1-$\sigma bounds')
+    ax1.plot(X_hat[0,:]+np.sqrt(P[0,0,:]), X_hat[1,:]+np.sqrt(P[1,1,:]),'--',color='k', linewidth=line_width, alpha=0.8,label='1-$\sigma$ bounds')
     ax1.plot(X_hat[0,:]-np.sqrt(P[0,0,:]), X_hat[1,:]-np.sqrt(P[1,1,:]),'--',color='k', linewidth=line_width, alpha=0.8)
     #ax1.set_aspect('equal', 'box')
-    ax1.plot(delta_min*np.cos(an), delta_min*np.sin(an),linewidth=line_width, color='coral')
-    ax1.plot(delta_max*np.cos(an), delta_max*np.sin(an),linewidth=line_width, color='coral')
+    ax1.plot(delta_min*np.cos(an), delta_min*np.sin(an),linewidth=line_width, color='coral',label='Min Range')
+    ax1.plot(delta_max*np.cos(an), delta_max*np.sin(an),linewidth=line_width, color='green',label='Max Range')
+    ax1.legend()
+    ax1.set_ylabel('Y (m)')
+    ax1.set_xlabel('X (m)')
+    plt.title('Chaser Position')
+
 
     ax2 = fig.add_subplot(122)
     ax2.grid()
-    ax2.plot(t[1:], violation_probability,'--',color='black', linewidth=line_width)
+    ax2.plot(t[1:], violation_probability, color='red', linewidth=1.5*line_width)
+    ax2.plot(t[0:], 0.95*np.ones([len(t)]), '--', color='black', linewidth=line_width, label='Threshold')
     ax2.set_ylabel('Probability In Safe Zone')
     ax2.set_xlabel('Time (s)')
+    plt.title('Probability Chaser is in Safe Zone')
+    ax2.set_xlim([0, t[-1]])
+
 # Save and Show 
     if f_save_plot: 
         plt.savefig('estimation_plot')
