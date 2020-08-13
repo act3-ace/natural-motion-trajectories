@@ -32,16 +32,17 @@ class ASIF(SystemParameters):
         # self.f_soften_constraint = False # Allows violation of barrier constraint
         
         # # Define Backup controller parameters 
-        # self.T_backup = 15 # [s] length of time in backup trajectory horizon 
-        # self.Nsteps = 50   # number steps in horizon of backup trajectory 
-        # self.Nskip = 5     # skip points when checking discrete trajectory points in optimization 
+        # self.T_backup = 30 # [s] length of time in backup trajectory horizon 
+        # self.Nsteps = 30   # number steps in horizon of backup trajectory 
+        # self.Nskip = 2     # skip points when checking discrete trajectory points in optimization 
         # self.kappa =  .6   # higher values of this make actuation stonger  
         
         # # Define ASIF parameters 
-        # self.alpha_coefficient = 5 # lower values give more of a "buffer" 
+        # self.alpha_coefficient = 2 # lower values give more of a "buffer" 
 
+        ########################## Set Parameters #############################
         # Flags 
-        self.f_use_heuristic = False # Apply heuristic that will speed up computation (but hasn't formally been proven to work) 
+        self.f_use_heuristic = False # Apply heuristic that will speed up computation (but weaken the safety guaruntees) 
         self.f_endpoint_constraint = True # Require that trajectory endpoint lie in invariant set 
         self.f_soften_constraint = False # Allows violation of barrier constraint
         
@@ -57,8 +58,9 @@ class ASIF(SystemParameters):
         # Define safety set and backup set parameters 
         self.eta_b = 0.1 # acceptable error magnitude from NMT plane for reachability constraint
         self.K1_s = 2.0*self.mean_motion # slope of safety boundary for speed limit constraint (must be >= 2n)
-        self.K2_s = .2 # 2*self.eta_b # max allowable speed at origin (must be > eta_b)
+        self.K2_s = .2*0.95 # max allowable speed at origin (must be > eta_b)
         
+        ################### Do Not Modify Below this Line #####################
         
         self.timevec = np.linspace(0, self.T_backup, self.Nsteps)
         self.dt = self.timevec[1]-self.timevec[0]
@@ -87,7 +89,6 @@ class ASIF(SystemParameters):
         
         self.phi  = np.zeros([4, self.Nsteps])
         self.S = np.zeros([4, 4, self.Nsteps])
-        # self.initialize_Dphi() 
         
     ##########################################################################    
     def main(self, x0, u_des):
@@ -230,7 +231,7 @@ class ASIF(SystemParameters):
         
         """
         r2 = x[0]**2 + x[1]**2
-        return self.K2_s**2 + (self.K1_s**2)*(r2) + self.K1_s*self.K2_s*np.sqrt(r2) - (x[2]**2 + x[3]**2) 
+        return self.K2_s**2 + (self.K1_s**2)*(r2) + 2*self.K1_s*self.K2_s*np.sqrt(r2) - (x[2]**2 + x[3]**2) 
 
     # ##########################################################################        
     def grad_hs(self, x):
@@ -329,15 +330,6 @@ class ASIF(SystemParameters):
         
         return (self.A + D_control)
 
-                                   
-    # def initialize_Dphi(self):
-    #     # integrate sensitivity matrix to get Dphi array
-        
-    #     self.S[:,:,0] = np.eye(4) 
-        
-    #     for i in range(1,self.Nsteps): 
-    #         # Sensitivity 
-    #         self.S[:,:,i] = self.S[:,:,i-1] + np.matmul(self.A, self.S[:,:,i-1])*self.dt
         
         
         
