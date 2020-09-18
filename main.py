@@ -27,7 +27,7 @@ from utilities.misc import probViolation
 # Import the Desired Controller from the "controllers" directory 
 from controllers.template_controller import Controller
 # Import the Desired Measurement Model 
-from MeasurementModels.angles_only import MeasurementModel
+from MeasurementModels.full_state_low_noise import MeasurementModel
 # Import the Desired Filter from the "filters" directory 
 from filters.ExtendedKalmanFilter import dynamicFilter
 # Import Active Set Invariance Filter (ASIF) (aka RTA mechanism)
