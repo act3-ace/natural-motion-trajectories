@@ -1,5 +1,11 @@
 # Translational Motion Simulator for Spacecraft Docking Problem 
 
+Created by: Mark Mote and Chris Hays
+
+Mentor: Kerianne Hobbs
+
+Approved for public release: distribution unlimited. Case Number 88ABW-2020-2696.
+
 This package provides simulation, estimation, and control for the attitude-independent version of the spacecraft docking problem, as outlined in the *challenge problem* document.    
 
 ## Key Variables 
